@@ -8,3 +8,5 @@ TASKS.md
 *.txt
 *.png
 *.jpg
+
+*.env
