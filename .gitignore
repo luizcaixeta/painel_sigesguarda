@@ -1,0 +1,10 @@
+/__pycache__
+TASKS.md
+*.zip
+*.csv
+*.xls
+*.XLS
+*.xlsx
+*.txt
+*.png
+*.jpg
