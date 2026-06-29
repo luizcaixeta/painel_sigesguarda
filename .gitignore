@@ -1,4 +1,6 @@
 __pycache__/
+build/
+.venv/
 TASKS.md
 *.zip
 *.csv
