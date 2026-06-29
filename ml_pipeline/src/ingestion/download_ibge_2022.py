@@ -4,7 +4,7 @@ import requests
 import zipfile 
 
 PROJETCT_ROOT = Path(__file__).resolve().parents[3]
-RAW_DIR = PROJETCT_ROOT / "data" / "ibge2022" / "raw"
+RAW_DIR = PROJETCT_ROOT / "data" / "bronze" / "ibge2022"
 
 LINKS = {
     "agregados_bairros_basico": "https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Agregados_por_Setores_Censitarios/Agregados_por_Bairro_csv/Agregados_por_bairros_basico_BR_20260520.zip",

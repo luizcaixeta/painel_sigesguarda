@@ -4,7 +4,7 @@ import requests
 import zipfile 
 
 PROJETCT_ROOT = Path(__file__).resolve().parents[3]
-RAW_DIR = PROJETCT_ROOT / "data" / "ibge2010" / "raw"
+RAW_DIR = PROJETCT_ROOT / "data" / "bronze" / "ibge2010"
 
 LINKS = {
     "censo2010_pr": "https://ftp.ibge.gov.br/Censos/Censo_Demografico_2010/Resultados_do_Universo/Agregados_por_Setores_Censitarios/PR_20260615.zip"

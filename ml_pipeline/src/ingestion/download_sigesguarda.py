@@ -8,7 +8,7 @@ import requests
 import argparse 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-RAW_DIR = PROJECT_ROOT / "data" / "SIGESGUARDA" / "raw"
+RAW_DIR = PROJECT_ROOT / "data" / "bronze" / "sigesguarda"
 STATE_FILE = RAW_DIR / "download_state.json"
 
 SIGESGUARDA_DATASET_KEY = "b16ead9d-835e-41e8-a4d7-dcc4f2b4b627"
