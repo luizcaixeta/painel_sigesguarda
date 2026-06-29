@@ -17,6 +17,11 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 
 .PHONY: help lint test check run \
 		python-lint python-test \
+		sigesguarda-check-update \
+		sigesguarda-download \
+		ibge-download-2010 \
+		ibge-download-2022 \
+		ingestion \
 		go-lint go-test go-tidy \
 		migrations-new migrations-up migrations-down migrations-status confirm
 
@@ -38,6 +43,20 @@ python-lint: ## Run Python lint checks
 
 python-test: ## Run Python tests
 	cd $(PY_DIR) && $(PYTHON) -m pytest
+
+sigesguarda-check-update: ## Check if a newer SIGESGUARDA file is available without downloading
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_sigesguarda.py --check-only
+
+sigesguarda-download: ## Download latest SIGESGUARDA data if updated 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_sigesguarda.py
+
+ibge-download-2010: ## Download IBGE 2010 data 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_ibge_2010.py 
+
+ibge-download-2022: ## Download IBGE 2022 data 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_ibge_2022.py
+
+ingestion: sigesguarda-download ibge-download-2010 ibge-download-2022 ## Run all ingestion scripts
 
 go-lint: ## Run Go lint checks
 	cd $(GO_DIR) && go vet ./...
