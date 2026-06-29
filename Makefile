@@ -7,7 +7,7 @@ GO_DIR ?= api
 GO_MAIN ?= ./cmd/server
 
 PY_DIR ?= ml_pipeline
-PYTHON ?= python3
+PYTHON ?= .venv/bin/python
 
 MIGRATIONS_DIR ?= api/migrations
 steps ?= 1
@@ -23,7 +23,11 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		ibge-download-2022 \
 		ingestion \
 		go-lint go-test go-tidy \
-		migrations-new migrations-up migrations-down migrations-status confirm
+		migrations-new migrations-up migrations-down migrations-status confirm \
+		bronze-load \
+		bronze-load-sigesguarda \
+		bronze-load-ibge2010 \
+		bronze-load-ibge2022
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -87,3 +91,15 @@ migrations-down: confirm ## Roll back migrations. Usage: make migrations-down st
 
 migrations-status: ## Show migration status
 	tern status -m $(MIGRATIONS_DIR) --conn-string "$(SIGESGUARDA_DB_DSN)"
+
+bronze-load: ## Load all bronze CSV files into PostgreSQL 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --dsn "$(SIGESGUARDA_DB_DSN)"
+
+bronze-load-sigesguarda: ## Load SIGESGUARDA bronze CSV files 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source sigesguarda --dsn "$(SIGESGUARDA_DB_DSN)"
+
+bronze-load-ibge2010: ## Load IBGE 2010 bronze CSV files
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2010 --dsn "$(SIGESGUARDA_DB_DSN)"
+
+bronze-load-ibge2022: ## Load IBGE 2022 bronze CSV files 
+	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
