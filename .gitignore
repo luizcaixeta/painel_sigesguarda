@@ -1,4 +1,5 @@
 __pycache__/
+sigesguarda_ml_pipeline.egg-info/
 build/
 .venv/
 TASKS.md
