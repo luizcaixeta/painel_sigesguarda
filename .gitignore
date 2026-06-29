@@ -8,5 +8,8 @@ TASKS.md
 *.txt
 *.png
 *.jpg
+*.json
+
+.vscode
 
 *.env
