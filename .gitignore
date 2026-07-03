@@ -12,6 +12,7 @@ TASKS.md
 *.png
 *.jpg
 *.json
+*.parquet
 
 .vscode
 
