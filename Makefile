@@ -110,16 +110,16 @@ bronze-load-ibge2022: ## Load IBGE 2022 bronze CSV files
 	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
 
 silver: ## Build all silver Parquet datasets
-	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source all
+	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source all
 
 silver-sigesguarda: ## Build SIGESGUARDA silver Parquet dataset
-	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source sigesguarda
+	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source sigesguarda
 
 silver-ibge: ## Build IBGE 2010 and 2022 silver Parquet datasets
-	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge
+	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source ibge
 
 silver-ibge2010: ## Build IBGE 2010 silver Parquet dataset
-	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge2010
+	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source ibge2010
 
 silver-ibge2022: ## Build IBGE 2022 silver Parquet dataset
-	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge2022
+	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source ibge2022
