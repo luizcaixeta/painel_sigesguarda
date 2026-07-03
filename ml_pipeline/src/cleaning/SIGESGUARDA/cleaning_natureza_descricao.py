@@ -27,6 +27,7 @@ CORRECOES = {
     "exploraaao de menores": "exploracao de menores",
     "extravio sonegaaao ou inutilizaaao de livro ou doc": "extravio sonegacao ou inutilizacao de livro ou doc",
     "falsidade ideola3gica falsa identidade": "falsidade ideologica falsa identidade",
+    "falsificaaao de documento publico": "falsificacao de documento publico",
     "fiscalizaaaes e orientaaaes": "fiscalizacoes e orientacoes",
     "fornecimento de bebida alcoa3lica a menores": "fornecimento de bebida alcoolica a menores",
     "homicadio": "homicidio",
