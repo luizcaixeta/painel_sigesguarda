@@ -27,7 +27,12 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		bronze-load \
 		bronze-load-sigesguarda \
 		bronze-load-ibge2010 \
-		bronze-load-ibge2022
+		bronze-load-ibge2022 \
+		silver \
+		silver-sigesguarda \
+		silver-ibge \
+		silver-ibge2010 \
+		silver-ibge2022
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -103,3 +108,18 @@ bronze-load-ibge2010: ## Load IBGE 2010 bronze CSV files
 
 bronze-load-ibge2022: ## Load IBGE 2022 bronze CSV files 
 	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
+
+silver: ## Build all silver Parquet datasets
+	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source all
+
+silver-sigesguarda: ## Build SIGESGUARDA silver Parquet dataset
+	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source sigesguarda
+
+silver-ibge: ## Build IBGE 2010 and 2022 silver Parquet datasets
+	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge
+
+silver-ibge2010: ## Build IBGE 2010 silver Parquet dataset
+	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge2010
+
+silver-ibge2022: ## Build IBGE 2022 silver Parquet dataset
+	cd $(PY_DIR) && $(PYTHON) src/cleaning/silver/run.py --source ibge2022
