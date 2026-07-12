@@ -31,7 +31,10 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		silver-load \
 		silver-load-sigesguarda \
 		silver-load-ibge2010 \
-		silver-load-ibge2022
+		silver-load-ibge2022 \
+		gold-build \
+		gold-load \
+		gold-load-ml-features
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -123,3 +126,14 @@ silver-load-ibge2010: ## Build IBGE 2010 silver Parquet dataset and load it into
 silver-load-ibge2022: ## Build IBGE 2022 silver Parquet dataset and load it into PostgreSQL
 	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source ibge2022
 	cd $(PY_DIR) && $(PYTHON) src/silver/load_silver_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
+
+gold-build: ## Build all gold Parquet datasets
+	cd $(PY_DIR) && $(PYTHON) src/gold/run.py --source all
+
+gold-load: ## Build all gold Parquet datasets and load them into PostgreSQL
+	cd $(PY_DIR) && $(PYTHON) src/gold/run.py --source all
+	cd $(PY_DIR) && $(PYTHON) src/gold/load_gold_to_postgres.py --source all --dsn "$(SIGESGUARDA_DB_DSN)"
+
+gold-load-ml-features: ## Build ML features gold Parquet dataset and load it into PostgreSQL
+	cd $(PY_DIR) && $(PYTHON) src/gold/run.py --source ml_features
+	cd $(PY_DIR) && $(PYTHON) src/gold/load_gold_to_postgres.py --source ml_features --dsn "$(SIGESGUARDA_DB_DSN)"
