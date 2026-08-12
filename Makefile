@@ -21,7 +21,7 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		sigesguarda-download \
 		ibge-download-2010 \
 		ibge-download-2022 \
-		ingestion \
+		bronze \
 		go-lint go-test go-tidy \
 		migrations-new migrations-up migrations-down migrations-status confirm \
 		bronze-load \
@@ -56,18 +56,18 @@ python-test: ## Run Python tests
 	cd $(PY_DIR) && $(PYTHON) -m pytest
 
 sigesguarda-check-update: ## Check if a newer SIGESGUARDA file is available without downloading
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_sigesguarda.py --check-only
+	cd $(PY_DIR) && $(PYTHON) src/bronze/download_sigesguarda.py --check-only
 
 sigesguarda-download: ## Download latest SIGESGUARDA data if updated 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_sigesguarda.py
+	cd $(PY_DIR) && $(PYTHON) src/bronze/download_sigesguarda.py
 
 ibge-download-2010: ## Download IBGE 2010 data 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_ibge_2010.py 
+	cd $(PY_DIR) && $(PYTHON) src/bronze/download_ibge_2010.py 
 
 ibge-download-2022: ## Download IBGE 2022 data 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/download_ibge_2022.py
+	cd $(PY_DIR) && $(PYTHON) src/bronze/download_ibge_2022.py
 
-ingestion: sigesguarda-download ibge-download-2010 ibge-download-2022 ## Run all ingestion scripts
+bronze: sigesguarda-download ibge-download-2010 ibge-download-2022 ## Run all bronze scripts
 
 go-lint: ## Run Go lint checks
 	cd $(GO_DIR) && go vet ./...
@@ -100,16 +100,16 @@ migrations-status: ## Show migration status
 	tern status -m $(MIGRATIONS_DIR) --conn-string "$(SIGESGUARDA_DB_DSN)"
 
 bronze-load: ## Load all bronze CSV files into PostgreSQL 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --dsn "$(SIGESGUARDA_DB_DSN)"
+	cd $(PY_DIR) && $(PYTHON) src/bronze/load_raw_to_postgres.py --dsn "$(SIGESGUARDA_DB_DSN)"
 
 bronze-load-sigesguarda: ## Load SIGESGUARDA bronze CSV files 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source sigesguarda --dsn "$(SIGESGUARDA_DB_DSN)"
+	cd $(PY_DIR) && $(PYTHON) src/bronze/load_raw_to_postgres.py --source sigesguarda --dsn "$(SIGESGUARDA_DB_DSN)"
 
 bronze-load-ibge2010: ## Load IBGE 2010 bronze CSV files
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2010 --dsn "$(SIGESGUARDA_DB_DSN)"
+	cd $(PY_DIR) && $(PYTHON) src/bronze/load_raw_to_postgres.py --source ibge2010 --dsn "$(SIGESGUARDA_DB_DSN)"
 
 bronze-load-ibge2022: ## Load IBGE 2022 bronze CSV files 
-	cd $(PY_DIR) && $(PYTHON) src/ingestion/load_raw_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
+	cd $(PY_DIR) && $(PYTHON) src/bronze/load_raw_to_postgres.py --source ibge2022 --dsn "$(SIGESGUARDA_DB_DSN)"
 
 silver-load: ## Build all silver Parquet datasets and load them into PostgreSQL
 	cd $(PY_DIR) && $(PYTHON) src/silver/run.py --source all
