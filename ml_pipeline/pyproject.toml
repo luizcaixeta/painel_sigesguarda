@@ -8,4 +8,6 @@ dependencies = [
     "requests>=2.32.0",
     "pandas>=2.0",
     "pyarrow>=16.0",
+    "mlflow==3.13.0",
+    "sqlalchemy>=2.0",
 ]
