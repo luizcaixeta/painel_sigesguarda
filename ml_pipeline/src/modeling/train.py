@@ -1,7 +1,6 @@
 import mlflow
 from mlflow.sklearn import log_model as log_sklearn_model
 import numpy as np
-from mlflow.models import infer_signature
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import cross_validate
