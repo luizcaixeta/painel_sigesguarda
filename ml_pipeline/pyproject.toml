@@ -10,4 +10,5 @@ dependencies = [
     "pyarrow>=16.0",
     "mlflow==3.13.0",
     "sqlalchemy>=2.0",
+    "xgboost>=3.4.1",
 ]
