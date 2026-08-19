@@ -34,3 +34,6 @@ params = {
     "random_state": 42,
     "n_jobs": -1,
 }
+
+MLFLOW_MODEL_NAME = "SIGESGUARDA_XGBoostRegressor"
+ALIAS_NAME = "champion"
