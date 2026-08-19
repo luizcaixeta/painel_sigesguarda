@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from datetime import date
 import psycopg
 from psycopg import sql
 
-from ml_features import GOLD_COLUMNS, GOLD_DIR, GOLD_RELATIVE_PATH
+from gold.ml_features import GOLD_COLUMNS, GOLD_DIR, GOLD_RELATIVE_PATH
 
 @dataclass(frozen=True)
 class GoldDataset:
@@ -78,6 +79,7 @@ def create_load_batch(
     cur: psycopg.Cursor,
     dataset: GoldDataset,
     df: pd.DataFrame,
+    data_through: date,
 ) -> str:
     cur.execute(
         """
@@ -93,15 +95,17 @@ def create_load_batch(
         INSERT INTO gold.load_batches (
             dataset,
             source_path,
+            data_through,
             row_count,
             is_current
         )
-        VALUES (%s, %s, %s, true)
+        VALUES (%s, %s, %s, %s, true)
         RETURNING batch_id
         """,
         (
             dataset.name,
             str(dataset.path),
+            data_through,
             len(df),
         ),
     )
@@ -142,7 +146,8 @@ def load_dataset(conn: psycopg.Connection, dataset: GoldDataset) -> None:
     df = read_gold_parquet(dataset)
 
     with conn.cursor() as cur:
-        batch_id = create_load_batch(cur, dataset, df)
+        data_through = pd.to_datetime(df["data"]).max().date()
+        batch_id = create_load_batch(cur, dataset, df, data_through)
 
         if not df.empty:
             copy_dataframe_to_table(cur, dataset, batch_id, df)
