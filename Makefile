@@ -21,9 +21,9 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		sigesguarda-download \
 		ibge-download-2010 \
 		ibge-download-2022 \
-		bronze \
 		go-lint go-test go-tidy \
 		migrations-new migrations-up migrations-down migrations-status confirm \
+		bronze \
 		bronze-load \
 		bronze-load-sigesguarda \
 		bronze-load-ibge2010 \
@@ -34,7 +34,8 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		silver-load-ibge2022 \
 		gold-build \
 		gold-load \
-		gold-load-ml-features
+		gold-load-ml-features \
+		train
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -137,3 +138,6 @@ gold-load: ## Build all gold Parquet datasets and load them into PostgreSQL
 gold-load-ml-features: ## Build ML features gold Parquet dataset and load it into PostgreSQL
 	cd $(PY_DIR) && $(PYTHON) src/gold/run.py --source ml_features
 	cd $(PY_DIR) && $(PYTHON) src/gold/load_gold_to_postgres.py --source ml_features --dsn "$(SIGESGUARDA_DB_DSN)"
+
+train: ## Train the model using data from the gold layer
+	cd $(PY_DIR) && $(PYTHON) src/modeling/train.py 
