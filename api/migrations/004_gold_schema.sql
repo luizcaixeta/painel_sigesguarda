@@ -9,6 +9,7 @@ CREATE TABLE gold.load_batches (
     batch_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     dataset text NOT NULL CHECK (dataset IN ('ml_features')),
     source_path text NOT NULL,
+    data_through DATE NOT NULL,
     row_count integer NOT NULL CHECK (row_count >= 0),
     loaded_at timestamptz NOT NULL DEFAULT now(),
     is_current boolean NOT NULL DEFAULT true
