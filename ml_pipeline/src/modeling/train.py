@@ -1,5 +1,9 @@
+import os
+from dotenv import load_dotenv
+
 import mlflow
 from mlflow.sklearn import log_model as log_sklearn_model
+from mlflow.models import infer_signature
 import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import make_scorer
@@ -14,9 +18,16 @@ from modeling.config import (
     FEATURES_NUMERICAS,
     TARGET,
     params,
+    MLFLOW_MODEL_NAME,
+    ALIAS_NAME,
 )
 from modeling.data import db_url, load_gold_dataframe
 from modeling.split import make_time_series_split
+from modeling.registry import promote_version
+
+load_dotenv()
+
+MLFLOW_TRACKING_URI = str(os.getenv("MLFLOW_TRACKING_URI"))
 
 def total_error(y_true, y_pred) -> float:
     return float(np.sum(y_pred) - np.sum(y_true))
@@ -30,6 +41,10 @@ def relative_bias(y_true, y_pred) -> float:
     return total_error(y_true, y_pred) / actual_total
 
 def main() -> Pipeline:
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment("SIGESGUARDA training")
+
     # 1. Dados
     df_ml = load_gold_dataframe(db_url)
 
@@ -114,14 +129,37 @@ def main() -> Pipeline:
 
         pipeline.fit(X, y)
 
-        log_sklearn_model(
-            sk_model=pipeline,
-            name="model",
+        input_example = X.head(5).copy()
+        example_predictions = pipeline.predict(input_example)
+
+        signature = infer_signature(
+            model_input=input_example,
+            model_output=example_predictions,
         )
 
-        mlflow.set_tag(
-            "Training Info",
-            "XGBoost for SIGESGUARDA data",
+        model_info = log_sklearn_model(
+            sk_model=pipeline,
+            name="model",
+            registered_model_name=MLFLOW_MODEL_NAME,
+            signature=signature,
+            input_example=input_example
+        )
+
+        registered_version = str(model_info.registered_model_version)
+
+        promote_version(
+            model_name=MLFLOW_MODEL_NAME,
+            alias_name=ALIAS_NAME,
+            version=registered_version,
+        )
+
+        mlflow.set_tags(
+            {
+                "registered_model_name": (MLFLOW_MODEL_NAME),
+                "registered_model_version": str(registered_version),
+                "promoted_alias": (ALIAS_NAME),
+                "promotion_status": "promoted",
+            }
         )
 
     return pipeline
