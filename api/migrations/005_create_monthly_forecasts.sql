@@ -3,7 +3,7 @@ BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS monthly_forecasts;
 
-CREATE TABLE gold.forecast_runs (
+CREATE TABLE monthly_forecasts.forecast_runs (
     forecast_run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     gold_batch_id UUID NOT NULL REFERENCES gold.load_batches(batch_id),
     mlflow_model_name TEXT NOT NULL,
@@ -13,8 +13,8 @@ CREATE TABLE gold.forecast_runs (
     generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE gold.monthly_forecasts (
-    forecast_run_id UUID NOT NULL,
+CREATE TABLE monthly_forecasts.monthly_forecasts (
+    forecast_run_id UUID NOT NULL REFERENCES monthly_forecasts.forecast_runs(forecast_run_id) ON DELETE CASCADE,
     bairro TEXT NOT NULL,
 
     categoria TEXT NOT NULL CHECK (
@@ -33,12 +33,14 @@ CREATE TABLE gold.monthly_forecasts (
     PRIMARY KEY (forecast_run_id, bairro, categoria)
 );
 
+COMMIT;
+
 ---- create above / drop below ----
 
-BEGIN; ADD
+BEGIN;
 
-DROP TABLE IF EXISTS gold.monthly_forecasts;
-DROP TABLE IF EXISTS gold.forecast_runs;
+DROP TABLE IF EXISTS monthly_forecasts.monthly_forecasts;
+DROP TABLE IF EXISTS monthly_forecasts.forecast_runs;
 
 COMMIT;
 
