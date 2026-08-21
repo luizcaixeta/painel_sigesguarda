@@ -58,7 +58,7 @@ def linear_extrapolation(
         index='bairro',
         columns='ano',
         values=target_column,
-        aggfunc='first'
+        aggfunc='first',
     )
 
     source_values = target[[2010, 2022]].to_numpy(dtype=float)
