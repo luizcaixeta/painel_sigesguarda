@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
 import mlflow
 from mlflow.sklearn import log_model as log_sklearn_model
@@ -21,13 +22,15 @@ from modeling.config import (
     MLFLOW_MODEL_NAME,
     ALIAS_NAME,
 )
-from modeling.data import db_url, load_gold_dataframe
+from modeling.data import SQL_DIR, read_sql, load_sql_into_dataframe
 from modeling.split import make_time_series_split
 from modeling.registry import promote_version
 
 load_dotenv()
 
 MLFLOW_TRACKING_URI = str(os.getenv("MLFLOW_TRACKING_URI"))
+
+GOLD_QUERY = read_sql(SQL_DIR, 'load_gold_data', 'gold_query.sql')
 
 def total_error(y_true, y_pred) -> float:
     return float(np.sum(y_pred) - np.sum(y_true))
@@ -46,7 +49,7 @@ def main() -> Pipeline:
     mlflow.set_experiment("SIGESGUARDA training")
 
     # 1. Dados
-    df_ml = load_gold_dataframe(db_url)
+    df_ml = load_sql_into_dataframe(GOLD_QUERY)
 
     X = df_ml[FEATURES]
     y = df_ml[TARGET]
