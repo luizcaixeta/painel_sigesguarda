@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine 
 from sqlalchemy.sql.elements import TextClause
 import pandas as pd
 
