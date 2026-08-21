@@ -35,7 +35,9 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		gold-build \
 		gold-load \
 		gold-load-ml-features \
-		train
+		train \
+		load_future_features \
+		publish_forecast
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -141,3 +143,9 @@ gold-load-ml-features: ## Build ML features gold Parquet dataset and load it int
 
 train: ## Train the model using data from the gold layer
 	cd $(PY_DIR) && $(PYTHON) src/modeling/train.py 
+
+load_future_features: ## Load features for month + 1
+	cd $(PY_DIR) && $(PYTHON) src/modeling/future_features.py
+
+publish_forecast: ## Returns the model's forecasts for the last month + 1
+	cd $(PY_DIR) && $(PYTHON) src/modeling/publish_forecast.py 
