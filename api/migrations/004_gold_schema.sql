@@ -77,6 +77,14 @@ CREATE TABLE gold.ocorrencias_mensais_ml_features (
     UNIQUE (batch_id, bairro, categoria, data)
 );
 
+CREATE TABLE gold.dim_bairros(
+    bairro_id TEXT PRIMARY KEY,
+    codigo_ippuc SMALLINT NOT NULL UNIQUE CHECK (codigo_ippuc BETWEEN 1 AND 75),
+    nome TEXT NOT NULL UNIQUE,
+    geometry_ JSONB NOT NULL,
+    geometry_source TEXT NOT NULL
+);
+
 CREATE INDEX idx_gold_ml_features_batch ON gold.ocorrencias_mensais_ml_features (batch_id);
 CREATE INDEX idx_gold_ml_features_bairro_data ON gold.ocorrencias_mensais_ml_features (bairro, data);
 CREATE INDEX idx_gold_ml_features_categoria_data ON gold.ocorrencias_mensais_ml_features (categoria, data);
