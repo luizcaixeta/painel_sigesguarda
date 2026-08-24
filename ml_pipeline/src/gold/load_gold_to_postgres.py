@@ -9,7 +9,12 @@ from datetime import date
 import psycopg
 from psycopg import sql
 
-from gold.ml_features import GOLD_COLUMNS, GOLD_DIR, GOLD_RELATIVE_PATH
+from gold.ml_features import (
+    GOLD_COLUMNS, 
+    GOLD_DIR, 
+    GOLD_RELATIVE_PATH
+)
+from gold.load_dim_bairros import load_dim_bairros, load_features
 
 @dataclass(frozen=True)
 class GoldDataset:
@@ -158,6 +163,9 @@ def resolve_datasets(source: str) -> list[GoldDataset]:
     if source == "all":
         return list(DATASETS.values())
 
+    if source == "dim_bairros":
+        return []
+
     return [DATASETS[source]]
 
 def parse_args() -> argparse.Namespace:
@@ -166,7 +174,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--source",
-        choices=["all", "ml_features"],
+        choices=["all", "ml_features", "dim_bairros"],
         default="all",
         help="Load all gold datasets or only one source.",
     )
@@ -189,7 +197,10 @@ def main() -> None:
     datasets = resolve_datasets(args.source)
 
     with psycopg.connect(args.dsn) as conn:
-        for dataset in datasets:
+        if args.source in {"all", "dim_bairros"}:
+            load_dim_bairros(conn, load_features())
+        
+        for dataset in resolve_datasets(args.source):
             load_dataset(conn, dataset)
 
         conn.commit()
