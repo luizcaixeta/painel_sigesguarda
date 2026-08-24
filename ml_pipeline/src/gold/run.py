@@ -1,6 +1,6 @@
 import argparse
 
-from ml_features import build_gold, write_gold
+from gold.ml_features import build_gold, write_gold
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build gold ML feature datasets.")
