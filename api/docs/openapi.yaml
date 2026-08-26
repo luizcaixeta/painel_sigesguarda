@@ -1,0 +1,991 @@
+openapi: 3.0.3
+
+info:
+  title: API do Painel SIGESGUARDA
+  version: 1.0.0
+  description: |
+    API REST somente de leitura para o dashboard territorial dos 75 bairros de
+    Curitiba.
+
+    Bairros, geometrias, ocorrencias observadas e IQV sao lidos exclusivamente
+    do contrato publicado da camada Gold no PostgreSQL. A API nao consulta as
+    camadas Bronze ou Silver e nao calcula, interpola ou completa dados durante
+    uma requisicao.
+
+    Previsoes sao lidas somente da publicacao persistida no PostgreSQL e
+    vinculada ao batch Gold corrente. O servico nao carrega o modelo, nao
+    executa inferencia e nao consulta o MLflow durante requisicoes; os
+    metadados do modelo fazem parte da propria publicacao.
+
+    Competencias mensais sao representadas por `YYYY-MM` e anos por numeros
+    inteiros. Os filtros repetiveis `bairro_id`, `categoria`, `mes` e `ano`
+    usam query parameters repetidos e correspondencia exata de codigo ou
+    periodo. Parametros desconhecidos sao rejeitados com
+    `400 INVALID_ARGUMENT`.
+
+    Rotas inexistentes retornam `404 NOT_FOUND` e metodos nao permitidos
+    retornam `405 METHOD_NOT_ALLOWED`, ambos usando o envelope `ErrorResponse`.
+
+    Todos os resultados possuem ordenacao deterministica, descrita em cada
+    operacao. Respostas de dados usam o envelope `meta`/`data`, exceto o
+    GeoJSON, que retorna uma `FeatureCollection` diretamente. Nao ha paginacao
+    no MVP.
+  contact:
+    name: Painel SIGESGUARDA
+
+servers:
+  - url: /
+    description: Servidor que hospeda a API
+
+tags:
+  - name: Saude
+    description: Estado do processo HTTP e de suas dependencias.
+  - name: Catalogos
+    description: Dimensoes territoriais e categorias publicadas na Gold.
+  - name: Mapa
+    description: Geometrias territoriais da Gold em GeoJSON.
+  - name: Ocorrencias
+    description: Contagens mensais observadas do batch Gold corrente.
+  - name: Previsoes
+    description: Publicacao persistida de X + 1 vinculada ao batch Gold corrente.
+  - name: IQV
+    description: Indice de Qualidade de Vida anual publicado na Gold.
+
+x-reject-unknown-query-parameters: true
+
+paths:
+  /healthz:
+    get:
+      tags: [Saude]
+      summary: Verifica se o processo HTTP esta vivo
+      description: |
+        Nao consulta o PostgreSQL nem qualquer outra dependencia externa. Uma
+        resposta `200` confirma apenas que o processo HTTP esta atendendo.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Processo HTTP vivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /readyz:
+    get:
+      tags: [Saude]
+      summary: Verifica se a API esta pronta para servir dados
+      description: |
+        Executa um ping no PostgreSQL e verifica o contrato minimo da camada
+        Gold e das tabelas de publicacao de previsoes consumidas pela API. Nao
+        estar pronto resulta em `503`.
+      operationId: getReadiness
+      responses:
+        "200":
+          description: PostgreSQL e contrato minimo de dados disponiveis.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+              example:
+                status: ready
+                checks:
+                  database: ok
+                  data_contract: ok
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/ReadinessUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/bairros:
+    get:
+      tags: [Catalogos]
+      summary: Lista os bairros
+      description: |
+        Retorna os 75 bairros publicados no catalogo territorial da Gold,
+        ordenados por `nome` crescente e, como desempate, por `bairro_id`
+        crescente.
+      operationId: listBairros
+      responses:
+        "200":
+          description: Catalogo territorial publicado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BairrosResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/bairros/geojson:
+    get:
+      tags: [Mapa]
+      summary: Retorna as geometrias dos bairros
+      description: |
+        Retorna as geometrias publicadas na Gold como uma `FeatureCollection`
+        com exatamente 75 `Feature`s, ordenadas por nome do bairro e depois
+        por `bairro_id`. O valor de `Feature.properties.bairro_id` e a chave
+        territorial usada por todos os demais endpoints.
+      operationId: getBairrosGeoJSON
+      responses:
+        "200":
+          description: Geometrias territoriais publicadas.
+          content:
+            application/geo+json:
+              schema:
+                $ref: "#/components/schemas/BairroFeatureCollection"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BairroFeatureCollection"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/categorias:
+    get:
+      tags: [Catalogos]
+      summary: Lista as categorias de ocorrencia
+      description: |
+        Retorna as seis categorias publicadas na Gold, ordenadas por nome de
+        exibicao crescente e depois por codigo crescente.
+      operationId: listCategorias
+      responses:
+        "200":
+          description: Catalogo das categorias publicadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriasResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/ocorrencias:
+    get:
+      tags: [Ocorrencias]
+      summary: Consulta ocorrencias mensais observadas
+      description: |
+        Consulta exclusivamente as contagens observadas do batch Gold corrente
+        e retorna uma linha por bairro, categoria e competencia.
+
+        A ordenacao e por `mes` crescente, nome do bairro crescente,
+        `bairro_id` crescente e `categoria` crescente.
+      operationId: listOcorrencias
+      parameters:
+        - $ref: "#/components/parameters/BairrosFiltro"
+        - $ref: "#/components/parameters/CategoriasFiltro"
+        - $ref: "#/components/parameters/MesesFiltro"
+        - $ref: "#/components/parameters/MesDe"
+        - $ref: "#/components/parameters/MesAte"
+      responses:
+        "200":
+          description: Ocorrencias observadas para os filtros aplicados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OcorrenciasResponse"
+              example:
+                meta:
+                  data_through: "2026-07"
+                  total_items: 1
+                data:
+                  - bairro_id: centro
+                    categoria: CRIME_PATRIMONIAL
+                    mes: "2026-07"
+                    quantidade: 128
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/previsoes:
+    get:
+      tags: [Previsoes]
+      summary: Consulta previsoes mensais publicadas
+      description: |
+        Retorna somente a publicacao valida para o mes seguinte (`X + 1`) a
+        ultima competencia observada (`X`) do batch Gold corrente. Uma linha e
+        devolvida por bairro e categoria.
+
+        A completude da publicacao e validada antes da aplicacao dos filtros.
+        A API nao consulta nem executa o modelo e nunca apresenta uma previsao
+        de batch antigo como atual. Se a publicacao de `X + 1` estiver ausente,
+        incompleta ou incompativel com a Gold corrente, retorna
+        `503 FORECAST_NOT_READY`.
+
+        A ordenacao e por `mes` crescente, nome do bairro crescente,
+        `bairro_id` crescente e `categoria` crescente.
+      operationId: listPrevisoes
+      parameters:
+        - $ref: "#/components/parameters/BairrosFiltro"
+        - $ref: "#/components/parameters/CategoriasFiltro"
+      responses:
+        "200":
+          description: Previsao publicada e valida para os filtros aplicados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrevisoesResponse"
+              example:
+                meta:
+                  total_items: 1
+                  gold_batch_id: "7b24e0ec-b64f-47be-a2e0-4c06e71f42c9"
+                  data_through: "2026-07"
+                  model_name: SIGESGUARDA_XGBoostRegressor
+                  model_alias: champion
+                  mlflow_run_id: 7f29ac12e2614e21b15f92713f25bc14
+                  generated_at: "2026-08-01T12:30:00Z"
+                  forecast_month: "2026-08"
+                data:
+                  - bairro_id: centro
+                    categoria: CRIME_PATRIMONIAL
+                    mes: "2026-08"
+                    quantidade: 131
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/ForecastUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/iqv:
+    get:
+      tags: [IQV]
+      summary: Consulta o Indice de Qualidade de Vida
+      description: |
+        Consulta exclusivamente o IQV anual publicado no batch Gold corrente e
+        retorna uma linha por bairro e ano.
+
+        Com mais de um ano, agrupa o resultado por `ano` crescente. Dentro de
+        cada ano, ordena por `iqv` na direcao indicada por `ordem` (padrao
+        `desc`), nome do bairro crescente e `bairro_id` crescente. Com apenas
+        um bairro, a sequencia representa sua evolucao anual.
+      operationId: listIQV
+      parameters:
+        - $ref: "#/components/parameters/BairrosFiltro"
+        - $ref: "#/components/parameters/AnosFiltro"
+        - $ref: "#/components/parameters/AnoDe"
+        - $ref: "#/components/parameters/AnoAte"
+        - $ref: "#/components/parameters/Ordem"
+      responses:
+        "200":
+          description: IQV para os filtros e a ordenacao aplicados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IQVResponse"
+              example:
+                meta:
+                  total_items: 1
+                data:
+                  - bairro_id: centro
+                    ano: 2022
+                    iqv: 84.71
+                    tipo_estimativa: observado
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    BairrosFiltro:
+      name: bairro_id
+      in: query
+      explode: true
+      description: |
+        Um ou mais IDs territoriais exatos retornados por
+        `GET /api/v1/bairros`. Repita o parametro para selecionar varios
+        bairros: `?bairro_id=centro&bairro_id=batel`. Quando omitido, inclui os
+        75 bairros. Lista vazia ou valor duplicado retorna
+        `400 INVALID_ARGUMENT`; qualquer codigo inexistente retorna
+        `400 INVALID_FILTER`.
+      schema:
+        type: array
+        minItems: 1
+        maxItems: 75
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/BairroId"
+      examples:
+        umBairro:
+          value: [centro]
+        variosBairros:
+          value: [centro, batel]
+
+    CategoriasFiltro:
+      name: categoria
+      in: query
+      explode: true
+      description: |
+        Uma ou mais categorias exatas retornadas por
+        `GET /api/v1/categorias`. Repita o parametro para selecionar varias
+        categorias: `?categoria=CRIME_PATRIMONIAL&categoria=CRIME_VIOLENTO`.
+        Quando omitido, inclui as seis categorias. Lista vazia ou valor
+        duplicado retorna `400 INVALID_ARGUMENT`; qualquer codigo inexistente
+        retorna `400 INVALID_FILTER`.
+      schema:
+        type: array
+        minItems: 1
+        maxItems: 6
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/CategoriaCodigo"
+      examples:
+        umaCategoria:
+          value: [CRIME_PATRIMONIAL]
+        variasCategorias:
+          value: [CRIME_PATRIMONIAL, CRIME_VIOLENTO]
+
+    MesesFiltro:
+      name: mes
+      in: query
+      explode: true
+      description: |
+        Uma ou mais competencias observadas especificas no formato `YYYY-MM`.
+        Repita o parametro para selecionar competencias nao contiguas:
+        `?mes=2026-05&mes=2026-07`. E incompativel com `de` e `ate`. Quando
+        nenhum filtro de periodo e informado, usa a ultima competencia
+        observada do batch Gold corrente. Lista vazia, competencia duplicada ou
+        formato invalido retorna `400 INVALID_ARGUMENT`.
+      schema:
+        type: array
+        minItems: 1
+        maxItems: 240
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/CompetenciaMensal"
+      examples:
+        umaCompetencia:
+          value: ["2026-07"]
+        competenciasEspecificas:
+          value: ["2026-05", "2026-07"]
+
+    MesDe:
+      name: de
+      in: query
+      description: |
+        Primeira competencia do intervalo inclusivo. Deve ser enviada com
+        `ate` e sem nenhuma ocorrencia de `mes`.
+      schema:
+        $ref: "#/components/schemas/CompetenciaMensal"
+      example: "2025-01"
+
+    MesAte:
+      name: ate
+      in: query
+      description: |
+        Ultima competencia do intervalo inclusivo. Deve ser enviada com `de`,
+        sem nenhuma ocorrencia de `mes`; `de` deve ser menor ou igual a `ate`
+        e o intervalo total nao pode exceder 240 meses.
+      schema:
+        $ref: "#/components/schemas/CompetenciaMensal"
+      example: "2026-07"
+
+    AnosFiltro:
+      name: ano
+      in: query
+      explode: true
+      description: |
+        Um ou mais anos especificos. Repita o parametro para selecionar anos
+        nao contiguos: `?ano=2020&ano=2022`. E incompativel com `de` e `ate`.
+        Quando nenhum filtro anual e informado, usa o ano mais recente
+        publicado no batch Gold corrente. Lista vazia, ano duplicado ou valor
+        fora do dominio publicado retorna `400 INVALID_ARGUMENT`.
+      schema:
+        type: array
+        minItems: 1
+        maxItems: 20
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/Ano"
+      examples:
+        umAno:
+          value: [2022]
+        anosEspecificos:
+          value: [2020, 2022]
+
+    AnoDe:
+      name: de
+      in: query
+      description: |
+        Primeiro ano do intervalo inclusivo. Deve ser enviado com `ate` e sem
+        nenhuma ocorrencia de `ano`.
+      schema:
+        $ref: "#/components/schemas/Ano"
+      example: 2019
+
+    AnoAte:
+      name: ate
+      in: query
+      description: |
+        Ultimo ano do intervalo inclusivo. Deve ser enviado com `de` e sem
+        nenhuma ocorrencia de `ano`; `de` deve ser menor ou igual a `ate`.
+      schema:
+        $ref: "#/components/schemas/Ano"
+      example: 2022
+
+    Ordem:
+      name: ordem
+      in: query
+      description: |
+        Direcao da ordenacao por IQV dentro de cada ano. Valor diferente de
+        `asc` ou `desc` retorna `400 INVALID_ARGUMENT`.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+      example: desc
+
+  responses:
+    InvalidRequest:
+      description: |
+        Parametro desconhecido, valor/formato invalido, combinacao de periodo
+        invalida ou filtro de codigo inexistente.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            invalidArgument:
+              summary: Parametro ou combinacao de periodo invalida
+              value:
+                error:
+                  code: INVALID_ARGUMENT
+                  message: invalid query parameter
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            invalidFilter:
+              summary: Codigo de filtro inexistente
+              value:
+                error:
+                  code: INVALID_FILTER
+                  message: unknown bairro_id
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+
+    ReadinessUnavailable:
+      description: |
+        PostgreSQL (`DATABASE_UNAVAILABLE`) ou contrato minimo de dados
+        (`DATA_NOT_READY`) indisponivel.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    DataUnavailable:
+      description: |
+        PostgreSQL indisponivel (`DATABASE_UNAVAILABLE`) ou batch Gold corrente
+        ausente (`DATA_NOT_READY`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    ForecastUnavailable:
+      description: |
+        PostgreSQL ou batch Gold indisponivel, ou previsao ausente, incompleta
+        ou incompativel com o batch Gold corrente.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            forecastNotReady:
+              value:
+                error:
+                  code: FORECAST_NOT_READY
+                  message: compatible complete forecast unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            dataNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: current Gold batch unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            databaseUnavailable:
+              value:
+                error:
+                  code: DATABASE_UNAVAILABLE
+                  message: database unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+
+    InternalError:
+      description: |
+        Erro inesperado (`INTERNAL_ERROR`), sem exposicao de detalhes internos.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  headers:
+    RequestId:
+      description: Identificador da requisicao usado para correlacao.
+      schema:
+        type: string
+      example: "7a4626f4-4ade-419f-9d60-bd476929733d"
+
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+          example: ready
+        checks:
+          type: object
+          additionalProperties: false
+          required: [database, data_contract]
+          properties:
+            database:
+              type: string
+              enum: [ok]
+              example: ok
+            data_contract:
+              type: string
+              enum: [ok]
+              example: ok
+
+    BairroId:
+      type: string
+      minLength: 1
+      maxLength: 100
+      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      description: Identificador territorial estavel e independente do nome de exibicao.
+      example: centro
+
+    CompetenciaMensal:
+      type: string
+      pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+      description: Competencia mensal no formato `YYYY-MM`.
+      example: "2026-07"
+
+    Ano:
+      type: integer
+      format: int32
+      minimum: 2009
+      maximum: 2028
+      description: Ano calendario representado como inteiro.
+      example: 2022
+
+    CategoriaCodigo:
+      type: string
+      description: Codigo estavel de uma das seis categorias publicadas na Gold.
+      enum:
+        - ACIDENTE_TRANSITO
+        - ATENDIMENTO_OPERACIONAL_ASSISTENCIAL
+        - CRIME_PATRIMONIAL
+        - CRIME_VIOLENTO
+        - CRIME_ORDEM_PUBLICA
+        - CRIME_DROGAS_SUBSTANCIAS
+      example: CRIME_PATRIMONIAL
+
+    TipoEstimativa:
+      type: string
+      description: |
+        Origem temporal do IQV anual, preservada exatamente como publicada na
+        Gold.
+      enum: [observado, interpolado, extrapolado]
+      example: observado
+
+    TotalItemsMeta:
+      type: object
+      additionalProperties: false
+      required: [total_items]
+      properties:
+        total_items:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Quantidade de itens presentes em `data`.
+          example: 75
+
+    Bairro:
+      type: object
+      additionalProperties: false
+      required: [bairro_id, nome]
+      properties:
+        bairro_id:
+          $ref: "#/components/schemas/BairroId"
+        nome:
+          type: string
+          minLength: 1
+          description: Nome de exibicao do bairro.
+          example: Centro
+
+    BairrosResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/TotalItemsMeta"
+        data:
+          type: array
+          minItems: 75
+          maxItems: 75
+          items:
+            $ref: "#/components/schemas/Bairro"
+
+    Categoria:
+      type: object
+      additionalProperties: false
+      required: [codigo, nome]
+      properties:
+        codigo:
+          $ref: "#/components/schemas/CategoriaCodigo"
+        nome:
+          type: string
+          minLength: 1
+          description: Nome de exibicao da categoria.
+          example: Crime patrimonial
+
+    CategoriasResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/TotalItemsMeta"
+        data:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/Categoria"
+
+    OcorrenciasMeta:
+      type: object
+      additionalProperties: false
+      required: [data_through, total_items]
+      properties:
+        data_through:
+          allOf:
+            - $ref: "#/components/schemas/CompetenciaMensal"
+          description: Ultima competencia observada contida no batch Gold consultado.
+        total_items:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Quantidade de itens presentes em `data`.
+          example: 1
+
+    Ocorrencia:
+      type: object
+      additionalProperties: false
+      required: [bairro_id, categoria, mes, quantidade]
+      properties:
+        bairro_id:
+          $ref: "#/components/schemas/BairroId"
+        categoria:
+          $ref: "#/components/schemas/CategoriaCodigo"
+        mes:
+          $ref: "#/components/schemas/CompetenciaMensal"
+        quantidade:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            Quantidade observada publicada na Gold. Zero e uma contagem
+            observada valida e nao representa ausencia de dado.
+          example: 128
+
+    OcorrenciasResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/OcorrenciasMeta"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ocorrencia"
+
+    PrevisoesMeta:
+      type: object
+      additionalProperties: false
+      required:
+        - total_items
+        - gold_batch_id
+        - data_through
+        - model_name
+        - model_alias
+        - mlflow_run_id
+        - generated_at
+        - forecast_month
+      properties:
+        total_items:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Quantidade de itens presentes em `data` apos os filtros.
+          example: 450
+        gold_batch_id:
+          type: string
+          format: uuid
+          description: ID do batch Gold corrente ao qual a previsao esta vinculada.
+          example: "7b24e0ec-b64f-47be-a2e0-4c06e71f42c9"
+        data_through:
+          allOf:
+            - $ref: "#/components/schemas/CompetenciaMensal"
+          description: Ultima competencia observada (`X`) do batch Gold corrente.
+        model_name:
+          type: string
+          minLength: 1
+          description: |
+            Nome registrado do modelo, copiado para a publicacao. A presenca
+            deste campo nao implica consulta ao modelo ou ao MLflow.
+          example: SIGESGUARDA_XGBoostRegressor
+        model_alias:
+          type: string
+          minLength: 1
+          description: Alias do modelo persistido no momento da geracao.
+          example: champion
+        mlflow_run_id:
+          type: string
+          minLength: 1
+          description: |
+            ID da run persistido como metadado da publicacao; nao e resolvido
+            no MLflow durante a requisicao.
+          example: 7f29ac12e2614e21b15f92713f25bc14
+        generated_at:
+          type: string
+          format: date-time
+          description: Data e hora de geracao da publicacao em RFC 3339.
+          example: "2026-08-01T12:30:00Z"
+        forecast_month:
+          allOf:
+            - $ref: "#/components/schemas/CompetenciaMensal"
+          description: |
+            Competencia prevista por todos os itens da publicacao, exatamente
+            um mes depois de `data_through` do batch Gold corrente.
+
+    Previsao:
+      type: object
+      additionalProperties: false
+      required: [bairro_id, categoria, mes, quantidade]
+      properties:
+        bairro_id:
+          $ref: "#/components/schemas/BairroId"
+        categoria:
+          $ref: "#/components/schemas/CategoriaCodigo"
+        mes:
+          allOf:
+            - $ref: "#/components/schemas/CompetenciaMensal"
+          description: Competencia prevista; coincide com `meta.forecast_month`.
+        quantidade:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Contagem prevista armazenada na publicacao validada.
+          example: 131
+
+    PrevisoesResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PrevisoesMeta"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Previsao"
+
+    IQVItem:
+      type: object
+      additionalProperties: false
+      required: [bairro_id, ano, iqv, tipo_estimativa]
+      properties:
+        bairro_id:
+          $ref: "#/components/schemas/BairroId"
+        ano:
+          $ref: "#/components/schemas/Ano"
+        iqv:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: |
+            Indice de Qualidade de Vida entre 0 e 100, preservado exatamente
+            como publicado na Gold.
+          example: 84.71
+        tipo_estimativa:
+          $ref: "#/components/schemas/TipoEstimativa"
+
+    IQVResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/TotalItemsMeta"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IQVItem"
+
+    BairroFeatureCollection:
+      type: object
+      additionalProperties: false
+      required: [type, features]
+      properties:
+        type:
+          type: string
+          enum: [FeatureCollection]
+          example: FeatureCollection
+        features:
+          type: array
+          minItems: 75
+          maxItems: 75
+          items:
+            $ref: "#/components/schemas/BairroFeature"
+
+    BairroFeature:
+      type: object
+      additionalProperties: false
+      required: [type, properties, geometry]
+      properties:
+        type:
+          type: string
+          enum: [Feature]
+          example: Feature
+        properties:
+          $ref: "#/components/schemas/Bairro"
+        geometry:
+          oneOf:
+            - $ref: "#/components/schemas/PolygonGeometry"
+            - $ref: "#/components/schemas/MultiPolygonGeometry"
+
+    Position:
+      type: array
+      description: Par longitude/latitude, opcionalmente seguido de altitude.
+      minItems: 2
+      maxItems: 3
+      items:
+        type: number
+        format: double
+      example: [-49.2733, -25.4284]
+
+    LinearRing:
+      type: array
+      minItems: 4
+      description: Anel fechado; a primeira e a ultima posicao sao iguais.
+      items:
+        $ref: "#/components/schemas/Position"
+
+    PolygonCoordinates:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/components/schemas/LinearRing"
+
+    PolygonGeometry:
+      type: object
+      additionalProperties: false
+      required: [type, coordinates]
+      properties:
+        type:
+          type: string
+          enum: [Polygon]
+          example: Polygon
+        coordinates:
+          $ref: "#/components/schemas/PolygonCoordinates"
+
+    MultiPolygonGeometry:
+      type: object
+      additionalProperties: false
+      required: [type, coordinates]
+      properties:
+        type:
+          type: string
+          enum: [MultiPolygon]
+          example: MultiPolygon
+        coordinates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PolygonCoordinates"
+
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_ARGUMENT
+        - INVALID_FILTER
+        - NOT_FOUND
+        - METHOD_NOT_ALLOWED
+        - DATA_NOT_READY
+        - FORECAST_NOT_READY
+        - DATABASE_UNAVAILABLE
+        - INTERNAL_ERROR
+      example: INVALID_ARGUMENT
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+              minLength: 1
+              description: Mensagem publica sem SQL, DSN, stack trace ou detalhes internos.
+              example: invalid query parameter
+            request_id:
+              type: string
+              minLength: 1
+              description: Identificador da requisicao para correlacao de logs.
+              example: "7a4626f4-4ade-419f-9d60-bd476929733d"
