@@ -4,6 +4,30 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from gold.load_dim_bairros import make_bairro_id
+from gold.config import (
+    BAIRRO_RAW,
+    ANO_RAW,
+    MES_RAW,
+    ANO_CENSO_2010,
+    ANO_CENSO_2022,
+    CATEGORIAS_MODELADAS,
+    SOCIO_BASE_COLUMNS,
+    SANITATION_BASES,
+    COUNT_BASES,
+    PERCENT_BASES,
+    IQV_WEIGHTS,
+    LOWER_IS_BETTER_IQV_COLUMNS,
+    SOCIOECONOMIC_RENAME,
+    SOCIOECONOMIC_GOLD_COLUMNS,
+    LAGS,
+    ROLLING_WINDOWS,
+    TEMPORAL_COLUMNS,
+    SOCIO_OUTPUT_COLUMNS,
+    GOLD_COLUMNS,
+    SORT_COLUMNS,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SILVER_DIR = PROJECT_ROOT / "data" / "silver"
 GOLD_DIR = PROJECT_ROOT / "data" / "gold"
@@ -12,125 +36,7 @@ SIGESGUARDA_SILVER_PATH = SILVER_DIR / "sigesguarda" / "base_unificada.parquet"
 IBGE_2010_SILVER_PATH = SILVER_DIR / "ibge2010" / "base_bairros_2010.parquet"
 IBGE_2022_SILVER_PATH = SILVER_DIR / "ibge2022" / "base_bairros_2022.parquet"
 GOLD_RELATIVE_PATH = "ml_features/ocorrencias_mensais.parquet"
-
-BAIRRO_RAW = "ATENDIMENTO_BAIRRO_NOME"
-ANO_RAW = "OCORRENCIA_ANO"
-MES_RAW = "OCORRENCIA_MES"
-ANO_CENSO_2010 = 2010
-ANO_CENSO_2022 = 2022
-
-CATEGORIAS_MODELADAS = (
-    "ACIDENTE_TRANSITO",
-    "ATENDIMENTO_OPERACIONAL_ASSISTENCIAL",
-    "CRIME_PATRIMONIAL",
-    "CRIME_VIOLENTO",
-    "CRIME_ORDEM_PUBLICA",
-    "CRIME_DROGAS_SUBSTANCIAS",
-)
-
-SOCIO_BASE_COLUMNS = {
-    "populacao": ("populacao_2010", "populacao_2022"),
-    "resp_domicilios_particulares": (
-        "resp_domicilios_particulares_2010",
-        "resp_domicilios_particulares_2022",
-    ),
-    "rendimento_medio_responsavel_sm": (
-        "rendimento_medio_responsavel_sm_2010",
-        "rendimento_medio_responsavel_sm_2022",
-    ),
-    "pop_15mais": ("pop_15mais_2010", "pop_15mais_2022"),
-    "alfabetizados_15mais": (
-        "alfabetizados_15mais_2010",
-        "alfabetizados_15mais_2022",
-    ),
-    "domicilios_particulares_ocupados": (
-        "domicilios_particulares_permanentes_2010",
-        "domicilios_particulares_permanentemente_ocupados_2022",
-    ),
-    "sem_banheiro_sanitario": (
-        "sem_banheiro_sanitario_2010",
-        "sem_banheiro_sanitario_2022",
-    ),
-    "esgotamento_precario": ("esgotamento_precario_2010", "esgotamento_precario_2022"),
-    "sem_rede_geral_agua": (
-        "sem_rede_geral_agua_2010",
-        "sem_rede_geral_agua_2022",
-    ),
-    "lixo_destino_inadequado": (
-        "lixo_destino_inadequado_2010",
-        "lixo_destino_inadequado_2022",
-    ),
-}
-
-SANITATION_BASES = (
-    "sem_banheiro_sanitario",
-    "esgotamento_precario",
-    "sem_rede_geral_agua",
-    "lixo_destino_inadequado",
-)
-
-COUNT_BASES = (
-    "populacao",
-    "resp_domicilios_particulares",
-    "pop_15mais",
-    "alfabetizados_15mais",
-    "analfabetos_15mais",
-    "domicilios_particulares_ocupados",
-    *SANITATION_BASES,
-)
-
-PERCENT_BASES = (
-    "alfabetizacao_15mais",
-    "analfabetismo_15mais",
-    *SANITATION_BASES,
-)
-
-IQV_WEIGHTS = {
-    "rendimento_medio_responsavel_sm_estimado": 1 / 3,
-    "pct_alfabetizacao_15mais_estimado": 1 / 3,
-    "pct_sem_banheiro_sanitario_estimado": 1 / 12,
-    "pct_esgotamento_precario_estimado": 1 / 12,
-    "pct_sem_rede_geral_agua_estimado": 1 / 12,
-    "pct_lixo_destino_inadequado_estimado": 1 / 12,
-}
-LOWER_IS_BETTER_IQV_COLUMNS = {
-    "pct_sem_banheiro_sanitario_estimado",
-    "pct_esgotamento_precario_estimado",
-    "pct_sem_rede_geral_agua_estimado",
-    "pct_lixo_destino_inadequado_estimado",
-}
-
-LAGS = (1, 2, 3, 6, 12)
-ROLLING_WINDOWS = (3, 6, 12)
-LAG_COLUMNS = tuple(f"lag_{lag}" for lag in LAGS)
-ROLLING_COLUMNS = tuple(f"media_{window}" for window in ROLLING_WINDOWS)
-TEMPORAL_COLUMNS = (*LAG_COLUMNS, *ROLLING_COLUMNS)
-
-ID_COLUMNS = (
-    "bairro",
-    "data",
-    "categoria",
-    "y",
-    "ano",
-    "mes",
-    "tempo",
-)
-SOCIO_OUTPUT_COLUMNS = (
-    "tipo_estimativa",
-    "populacao_estimado",
-    "log_pop",
-    "iqv",
-)
-LOG_TEMPORAL_COLUMNS = tuple(f"log1p_{column}" for column in TEMPORAL_COLUMNS)
-CYCLICAL_MONTH_COLUMNS = ("mes_sin_1", "mes_cos_1", "mes_sin_2", "mes_cos_2")
-FEATURE_COLUMNS = (
-    *TEMPORAL_COLUMNS,
-    "media_historica",
-    *LOG_TEMPORAL_COLUMNS,
-    *CYCLICAL_MONTH_COLUMNS,
-)
-GOLD_COLUMNS = (*ID_COLUMNS, *SOCIO_OUTPUT_COLUMNS, *FEATURE_COLUMNS)
-SORT_COLUMNS = ("bairro", "categoria", "data")
+SOCIOECONOMIC_GOLD_RELATIVE_PATH = "indicadores_socioeconomicos/indicadores_anuais.parquet"
 
 def estimated_column(base: str) -> str:
     return f"{base}_estimado"
@@ -329,7 +235,20 @@ def finalize_socioeconomic_estimates(estimates: pd.DataFrame) -> pd.DataFrame:
     out["log_pop"] = np.log1p(out[estimated_column("populacao")].astype("float64"))
 
     return out[
-        ["bairro", "ano", "tipo_estimativa", "populacao_estimado", "log_pop", "iqv"]
+        [
+            "bairro",
+            "ano",
+            "tipo_estimativa",
+            "populacao_estimado",
+            "log_pop",
+            "rendimento_medio_responsavel_sm_estimado",
+            "pct_alfabetizacao_15mais_estimado",
+            "pct_sem_banheiro_sanitario_estimado",
+            "pct_esgotamento_precario_estimado",
+            "pct_sem_rede_geral_agua_estimado",
+            "pct_lixo_destino_inadequado_estimado",
+            "iqv",
+        ]
     ].copy()
 
 def build_socioeconomic_estimates(
@@ -478,6 +397,16 @@ def finalize_gold_schema(df: pd.DataFrame) -> pd.DataFrame:
 
     return sort_by_model_keys(out).reset_index(drop=True)
 
+def finalize_socioeconomic_gold(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.rename(columns=SOCIOECONOMIC_RENAME).copy()
+
+    out["bairro_id"] = out["bairro"].map(make_bairro_id)
+
+    if out["bairro_id"].isna().any():
+        raise ValueError("Gold socioeconomic: bairro_id with null values.")
+
+    return out.loc[:, list(SOCIOECONOMIC_GOLD_COLUMNS)]
+
 def build_monthly_panel(
     occurrences: pd.DataFrame,
     socioeconomic: pd.DataFrame,
@@ -494,7 +423,13 @@ def build_monthly_panel(
     panel = add_model_transforms(panel)
     return finalize_gold_schema(panel)
 
-def build_gold() -> pd.DataFrame:
+def build_gold_datasets(source: str = "all") -> dict[str, pd.DataFrame]:
+    valid_sources = {"all", "ml_features", "socioeconomic_features"}
+    if source not in valid_sources:
+        raise ValueError(
+            f"Gold source must be one of {sorted(valid_sources)}; received {source!r}."
+        )
+
     occurrences = prepare_occurrences(
         read_parquet(SIGESGUARDA_SILVER_PATH, "SIGESGUARDA silver")
     )
@@ -503,10 +438,33 @@ def build_gold() -> pd.DataFrame:
 
     years = occurrences["data"].dt.year.unique()
     socioeconomic = build_socioeconomic_estimates(ibge_2010, ibge_2022, years)
-    return build_monthly_panel(occurrences, socioeconomic)
+    datasets: dict[str, pd.DataFrame] = {}
+
+    if source in {"all", "ml_features"}:
+        datasets["ml_features"] = build_monthly_panel(occurrences, socioeconomic)
+
+    if source in {"all", "socioeconomic_features"}:
+        datasets["socioeconomic_features"] = socioeconomic
+
+    return datasets
+
+def build_gold() -> pd.DataFrame:
+    return build_gold_datasets("ml_features")["ml_features"]
 
 def write_gold(df: pd.DataFrame, relative_path: str = GOLD_RELATIVE_PATH) -> Path:
     output_path = (GOLD_DIR / relative_path).with_suffix(".parquet")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
+    return output_path
+
+def write_socioeconomic_gold(
+    df: pd.DataFrame,
+    relative_path: str = SOCIOECONOMIC_GOLD_RELATIVE_PATH,
+) -> Path:
+    output_path = (GOLD_DIR / relative_path).with_suffix(".parquet")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    socioeconomic_gold = finalize_socioeconomic_gold(df)
+    socioeconomic_gold.to_parquet(output_path, index=False)
+
     return output_path
