@@ -12,7 +12,9 @@ from psycopg import sql
 from gold.ml_features import (
     GOLD_COLUMNS, 
     GOLD_DIR, 
-    GOLD_RELATIVE_PATH
+    GOLD_RELATIVE_PATH,
+    SOCIOECONOMIC_GOLD_RELATIVE_PATH,
+    SOCIOECONOMIC_GOLD_COLUMNS,
 )
 from gold.load_dim_bairros import load_dim_bairros, load_features
 
@@ -37,6 +39,12 @@ DATASETS = {
         relative_path=GOLD_RELATIVE_PATH,
         table="gold.ocorrencias_mensais_ml_features",
         columns=GOLD_COLUMNS,
+    ),
+    "socioeconomic_features": GoldDataset(
+        name="socioeconomic_features",
+        relative_path=SOCIOECONOMIC_GOLD_RELATIVE_PATH,
+        table="gold.indicadores_socioeconomicos_anuais",
+        columns=SOCIOECONOMIC_GOLD_COLUMNS,
     ),
 }
 
