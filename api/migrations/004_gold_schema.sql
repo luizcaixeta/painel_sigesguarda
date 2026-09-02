@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS gold;
 
 CREATE TABLE gold.load_batches (
     batch_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    dataset text NOT NULL CHECK (dataset IN ('ml_features')),
+    dataset text NOT NULL CHECK (dataset IN ('ml_features', 'socioeconomic_features')),
     source_path text NOT NULL,
     data_through DATE NOT NULL,
     row_count integer NOT NULL CHECK (row_count >= 0),
@@ -85,6 +85,29 @@ CREATE TABLE gold.dim_bairros(
     geometry_source TEXT NOT NULL
 );
 
+CREATE TABLE gold.indicadores_socioeconomicos_anuais (
+    id bigserial PRIMARY KEY,
+    batch_id uuid NOT NULL REFERENCES gold.load_batches(batch_id),
+    source_row_number INTEGER NOT NULL CHECK (source_row_number > 0),
+
+    bairro_id TEXT NOT NULL REFERENCES gold.dim_bairros(bairro_id),
+    ano SMALLINT NOT NULL CHECK (ano BETWEEN 2009 AND 2050),
+
+    tipo_estimativa TEXT NOT NULL CHECK (tipo_estimativa IN ('observado', 'interpolado', 'extrapolado')),
+    rendimento_medio_responsavel_sm DOUBLE PRECISION NOT NULL CHECK (rendimento_medio_responsavel_sm >= 0),
+    pct_alfabetizacao_15mais DOUBLE PRECISION NOT NULL CHECK (pct_alfabetizacao_15mais BETWEEN 0 AND 100),
+    pct_sem_banheiro_sanitario DOUBLE PRECISION NOT NULL CHECK (pct_sem_banheiro_sanitario BETWEEN 0 AND 100),
+    pct_esgotamento_precario DOUBLE PRECISION NOT NULL CHECK (pct_esgotamento_precario BETWEEN 0 AND 100),
+    pct_sem_rede_geral_agua DOUBLE PRECISION NOT NULL CHECK (pct_sem_rede_geral_agua BETWEEN 0 AND 100),
+    pct_lixo_destino_inadequado DOUBLE PRECISION NOT NULL CHECK (pct_lixo_destino_inadequado BETWEEN 0 AND 100),
+    iqv DOUBLE PRECISION NOT NULL CHECK (iqv BETWEEN 0 AND 100),
+
+    loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE (batch_id, source_row_number),
+    UNIQUE (batch_id, bairro_id, ano)
+);
+
 CREATE INDEX idx_gold_ml_features_batch ON gold.ocorrencias_mensais_ml_features (batch_id);
 CREATE INDEX idx_gold_ml_features_bairro_data ON gold.ocorrencias_mensais_ml_features (bairro, data);
 CREATE INDEX idx_gold_ml_features_categoria_data ON gold.ocorrencias_mensais_ml_features (categoria, data);
@@ -95,7 +118,9 @@ COMMIT;
 
 BEGIN;
 
+DROP TABLE IF EXISTS gold.indicadores_socioeconomicos_anuais;
 DROP TABLE IF EXISTS gold.ocorrencias_mensais_ml_features;
+DROP TABLE IF EXISTS gold.dim_bairros;
 DROP TABLE IF EXISTS gold.load_batches;
 DROP SCHEMA IF EXISTS gold;
 
