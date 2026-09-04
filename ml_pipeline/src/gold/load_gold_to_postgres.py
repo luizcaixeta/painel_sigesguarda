@@ -186,11 +186,22 @@ def copy_dataframe_to_table(
                 )
             )
 
+def resolve_data_through(dataset: GoldDataset, df: pd.DataFrame) -> date:
+
+    if dataset.name == "ml_features":
+        return pd.to_datetime(df["data"]).max().date()
+
+    if dataset.name == "socioeconomic_features":
+        latest_year = int(df["ano"].max())
+        return date(latest_year, 12, 31)
+
+    raise ValueError(f'{dataset.name}: unsupported dataset')
+
 def load_dataset(conn: psycopg.Connection, dataset: GoldDataset) -> None:
     df = read_gold_parquet(dataset)
 
     with conn.cursor() as cur:
-        data_through = pd.to_datetime(df["data"]).max().date()
+        data_through = resolve_data_through(dataset, df)
         batch_id = create_load_batch(cur, dataset, df, data_through)
 
         if not df.empty:
