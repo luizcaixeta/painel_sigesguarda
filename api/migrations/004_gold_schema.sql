@@ -17,6 +17,27 @@ CREATE TABLE gold.load_batches (
 
 CREATE UNIQUE INDEX ux_gold_current_batch_per_dataset ON gold.load_batches (dataset) WHERE is_current;
 
+CREATE TABLE gold.dim_categorias (
+    codigo TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    ordem_exibicao SMALLINT NOT NULL UNIQUE
+);
+
+CREATE TABLE gold.dim_indicadores (
+    codigo TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    unidade TEXT NOT NULL,
+    ordem_exibicao SMALLINT NOT NULL UNIQUE
+);
+
+CREATE TABLE gold.dim_bairros(
+    bairro_id TEXT PRIMARY KEY,
+    codigo_ippuc SMALLINT NOT NULL UNIQUE CHECK (codigo_ippuc BETWEEN 1 AND 75),
+    nome TEXT NOT NULL UNIQUE,
+    geometry_ JSONB NOT NULL,
+    geometry_source TEXT NOT NULL
+);
+
 CREATE TABLE gold.ocorrencias_mensais_ml_features (
     id bigserial PRIMARY KEY,
     batch_id uuid NOT NULL REFERENCES gold.load_batches(batch_id),
@@ -24,16 +45,7 @@ CREATE TABLE gold.ocorrencias_mensais_ml_features (
 
     bairro text NOT NULL,
     data date NOT NULL,
-    categoria text NOT NULL CHECK (
-        categoria IN (
-            'ACIDENTE_TRANSITO',
-            'ATENDIMENTO_OPERACIONAL_ASSISTENCIAL',
-            'CRIME_PATRIMONIAL',
-            'CRIME_VIOLENTO',
-            'CRIME_ORDEM_PUBLICA',
-            'CRIME_DROGAS_SUBSTANCIAS'
-        )
-    ),
+    categoria TEXT NOT NULL REFERENCES gold.dim_categorias(codigo),
 
     y integer NOT NULL CHECK (y >= 0),
     ano smallint NOT NULL CHECK (ano BETWEEN 2009 AND 2028),
@@ -77,14 +89,6 @@ CREATE TABLE gold.ocorrencias_mensais_ml_features (
     UNIQUE (batch_id, bairro, categoria, data)
 );
 
-CREATE TABLE gold.dim_bairros(
-    bairro_id TEXT PRIMARY KEY,
-    codigo_ippuc SMALLINT NOT NULL UNIQUE CHECK (codigo_ippuc BETWEEN 1 AND 75),
-    nome TEXT NOT NULL UNIQUE,
-    geometry_ JSONB NOT NULL,
-    geometry_source TEXT NOT NULL
-);
-
 CREATE TABLE gold.indicadores_socioeconomicos_anuais (
     id bigserial PRIMARY KEY,
     batch_id uuid NOT NULL REFERENCES gold.load_batches(batch_id),
@@ -120,6 +124,8 @@ BEGIN;
 
 DROP TABLE IF EXISTS gold.indicadores_socioeconomicos_anuais;
 DROP TABLE IF EXISTS gold.ocorrencias_mensais_ml_features;
+DROP TABLE IF EXISTS gold.dim_categorias;
+DROP TABLE IF EXISTS gold.dim_indicadores;
 DROP TABLE IF EXISTS gold.dim_bairros;
 DROP TABLE IF EXISTS gold.load_batches;
 DROP SCHEMA IF EXISTS gold;
@@ -128,4 +134,3 @@ COMMIT;
 
 -- Write your migrate down statements here. If this migration is irreversible
 -- Then delete the separator line above.
-
