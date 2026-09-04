@@ -4,13 +4,23 @@ MES_RAW = "OCORRENCIA_MES"
 ANO_CENSO_2010 = 2010
 ANO_CENSO_2022 = 2022
 
-CATEGORIAS_MODELADAS = (
-    "ACIDENTE_TRANSITO",
-    "ATENDIMENTO_OPERACIONAL_ASSISTENCIAL",
-    "CRIME_PATRIMONIAL",
-    "CRIME_VIOLENTO",
-    "CRIME_ORDEM_PUBLICA",
-    "CRIME_DROGAS_SUBSTANCIAS",
+CATEGORIAS_CATALOGO = (
+    ("ACIDENTE_TRANSITO", "Acidente de trânsito", 1),
+    ("ATENDIMENTO_OPERACIONAL_ASSISTENCIAL", "Atendimento operacional e assistencial", 2),
+    ("CRIME_PATRIMONIAL", "Crime patrimonial", 3),
+    ("CRIME_VIOLENTO", "Crime violento", 4),
+    ("CRIME_ORDEM_PUBLICA", "Crime contra a ordem pública", 5),
+    ("CRIME_DROGAS_SUBSTANCIAS", "Drogas e substâncias", 6),
+)
+CATEGORIAS_MODELADAS = tuple(codigo for codigo, _, _ in CATEGORIAS_CATALOGO)
+
+INDICADORES_CATALOGO = (
+    ("RENDIMENTO_MEDIO_RESPONSAVEL_SM", "Rendimento médio do responsável", "salários mínimos", 1),
+    ("PCT_ALFABETIZACAO_15_MAIS", "Alfabetização da população com 15 anos ou mais", "percentual", 2),
+    ("PCT_SEM_BANHEIRO_SANITARIO", "Domicílios sem banheiro sanitário", "percentual", 3),
+    ("PCT_ESGOTAMENTO_PRECARIO", "Domicílios com esgotamento precário", "percentual", 4),
+    ("PCT_SEM_REDE_GERAL_AGUA", "Domicílios sem rede geral de água", "percentual", 5),
+    ("PCT_LIXO_DESTINO_INADEQUADO", "Domicílios com destino inadequado do lixo", "percentual", 6),
 )
 
 SOCIO_BASE_COLUMNS = {
