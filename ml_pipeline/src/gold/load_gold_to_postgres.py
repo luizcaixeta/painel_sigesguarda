@@ -1,22 +1,24 @@
 import argparse
 import os
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from datetime import date
 import psycopg
 from psycopg import sql
 
-from gold.ml_features import (
-    GOLD_COLUMNS, 
-    GOLD_DIR, 
-    GOLD_RELATIVE_PATH,
-    SOCIOECONOMIC_GOLD_RELATIVE_PATH,
-    SOCIOECONOMIC_GOLD_COLUMNS,
-)
+from gold.config import CATEGORIAS_CATALOGO, INDICADORES_CATALOGO
 from gold.load_dim_bairros import load_dim_bairros, load_features
+from gold.ml_features import (
+    GOLD_COLUMNS,
+    GOLD_DIR,
+    GOLD_RELATIVE_PATH,
+    SOCIOECONOMIC_GOLD_COLUMNS,
+    SOCIOECONOMIC_GOLD_RELATIVE_PATH,
+)
+
 
 @dataclass(frozen=True)
 class GoldDataset:
@@ -33,6 +35,7 @@ class GoldDataset:
     def table_identifier(self) -> sql.Identifier:
         return sql.Identifier(*self.table.split("."))
 
+
 DATASETS = {
     "ml_features": GoldDataset(
         name="ml_features",
@@ -47,6 +50,34 @@ DATASETS = {
         columns=SOCIOECONOMIC_GOLD_COLUMNS,
     ),
 }
+
+CATEGORIAS_UPSERT = """
+    INSERT INTO gold.dim_categorias (codigo, nome, ordem_exibicao)
+    VALUES (%s, %s, %s)
+    ON CONFLICT (codigo) DO UPDATE
+    SET nome = EXCLUDED.nome,
+        ordem_exibicao = EXCLUDED.ordem_exibicao
+"""
+
+INDICADORES_UPSERT = """
+    INSERT INTO gold.dim_indicadores (codigo, nome, unidade, ordem_exibicao)
+    VALUES (%s, %s, %s, %s)
+    ON CONFLICT (codigo) DO UPDATE
+    SET nome = EXCLUDED.nome,
+        unidade = EXCLUDED.unidade,
+        ordem_exibicao = EXCLUDED.ordem_exibicao
+"""
+
+
+def load_catalogs(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        cur.executemany(CATEGORIAS_UPSERT, CATEGORIAS_CATALOGO)
+        cur.executemany(INDICADORES_UPSERT, INDICADORES_CATALOGO)
+
+    print(
+        f"Loaded {len(CATEGORIAS_CATALOGO)} categories and "
+        f"{len(INDICADORES_CATALOGO)} indicators into Gold catalogs"
+    )
 
 def read_gold_parquet(dataset: GoldDataset) -> pd.DataFrame:
     if not dataset.path.exists():
@@ -205,10 +236,11 @@ def main() -> None:
     datasets = resolve_datasets(args.source)
 
     with psycopg.connect(args.dsn) as conn:
+        load_catalogs(conn)
+
         if args.source in {"all", "dim_bairros"}:
             load_dim_bairros(conn, load_features())
-        
-        for dataset in resolve_datasets(args.source):
+        for dataset in datasets:
             load_dataset(conn, dataset)
 
         conn.commit()
