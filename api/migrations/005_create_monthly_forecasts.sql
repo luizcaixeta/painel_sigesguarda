@@ -41,6 +41,7 @@ BEGIN;
 
 DROP TABLE IF EXISTS monthly_forecasts.monthly_forecasts;
 DROP TABLE IF EXISTS monthly_forecasts.forecast_runs;
+DROP SCHEMA IF EXISTS monthly_forecasts;
 
 COMMIT;
 
