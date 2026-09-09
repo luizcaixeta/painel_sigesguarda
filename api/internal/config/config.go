@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -13,6 +14,10 @@ type Config struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 	ShutdownTimeout   time.Duration
+	DatabaseDSN       string
+	DBMaxConns        int32
+	DBMinConns        int32
+	QueryTimeout      time.Duration
 }
 
 func parseString(name string) (string, error) {
@@ -40,6 +45,20 @@ func parseDuration(name string) (time.Duration, error) {
 	}
 
 	return duration, nil
+}
+
+func parseInt32(name string) (int32, error) {
+	rawValue := os.Getenv(name)
+	if rawValue == "" {
+		return 0, fmt.Errorf("the environment variable %s was not defined", name)
+	}
+
+	value, err := strconv.ParseInt(rawValue, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("error converting %s: %w", name, err)
+	}
+
+	return int32(value), nil
 }
 
 func Load() (Config, error) {
@@ -74,6 +93,38 @@ func Load() (Config, error) {
 	cfg.ShutdownTimeout, err = parseDuration("API_SIGESGUARDA_SHUTDOWN_TIMEOUT")
 	if err != nil {
 		return Config{}, err
+	}
+
+	cfg.DatabaseDSN, err = parseString("SIGESGUARDA_DB_DSN")
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.DBMaxConns, err = parseInt32("API_SIGESGUARDA_DB_MAX_CONNS")
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.DBMinConns, err = parseInt32("API_SIGESGUARDA_DB_MIN_CONNS")
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.QueryTimeout, err = parseDuration("API_SIGESGUARDA_QUERY_TIMEOUT")
+	if err != nil {
+		return Config{}, err
+	}
+
+	if cfg.DBMaxConns <= 0 {
+		return Config{}, fmt.Errorf("API_SIGESGUARDA_DB_MAX_CONNS must be positive")
+	}
+
+	if cfg.DBMinConns < 0 {
+		return Config{}, fmt.Errorf("API_SIGESGUARDA_DB_MIN_CONNS cannot be negative")
+	}
+
+	if cfg.DBMinConns > cfg.DBMaxConns {
+		return Config{}, fmt.Errorf("API_SIGESGUARDA_DB_MIN_CONNS cannot exceed API_SIGESGUARDA_DB_MAX_CONNS")
 	}
 
 	return cfg, nil
