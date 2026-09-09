@@ -12,6 +12,7 @@ func New(
 	readinessChecker handler.ReadinessChecker,
 	bairroLister handler.BairroLister,
 	categoriaLister handler.CategoriaLister,
+	ocorrenciaLister handler.OcorrenciaLister,
 	queryTimeout time.Duration,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -36,6 +37,11 @@ func New(
 		mux,
 		"/api/categorias",
 		handler.NewCategoriasHandler(categoriaLister, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/ocorrencias",
+		handler.NewOcorrenciasHandler(ocorrenciaLister, queryTimeout),
 	)
 	mux.HandleFunc("/", handler.NotFoundHandler)
 
