@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/config"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/database"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/router"
 )
 
@@ -19,6 +20,22 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
+
+	databaseContext, cancelDatabase := context.WithTimeout(
+		context.Background(),
+		cfg.QueryTimeout,
+	)
+	pool, err := database.NewPool(
+		databaseContext,
+		cfg.DatabaseDSN,
+		cfg.DBMinConns,
+		cfg.DBMaxConns,
+	)
+	cancelDatabase()
+	if err != nil {
+		return fmt.Errorf("initialize database: %w", err)
+	}
+	defer pool.Close()
 
 	httpHandler := router.New()
 
