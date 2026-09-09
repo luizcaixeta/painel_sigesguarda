@@ -47,7 +47,14 @@ func run() error {
 	readinessChecker := database.NewReadinessChecker(pool)
 	bairroRepository := repositories.NewBairroRepository(pool)
 	bairroService := services.NewBairroService(bairroRepository)
-	httpHandler := router.New(readinessChecker, bairroService, cfg.QueryTimeout)
+	categoriaRepository := repositories.NewCategoriaRepository(pool)
+	categoriaService := services.NewCategoriaService(categoriaRepository)
+	httpHandler := router.New(
+		readinessChecker,
+		bairroService,
+		categoriaService,
+		cfg.QueryTimeout,
+	)
 
 	server := &http.Server{
 		Addr:              cfg.APIAddr,
