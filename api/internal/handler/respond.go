@@ -18,7 +18,20 @@ type APIError struct {
 }
 
 func WriteJSON(w http.ResponseWriter, status int, response any) {
-	w.Header().Set("Content-Type", "application/json")
+	writeJSON(w, status, "application/json", response)
+}
+
+func WriteGeoJSON(w http.ResponseWriter, status int, response any) {
+	writeJSON(w, status, "application/geo+json", response)
+}
+
+func writeJSON(
+	w http.ResponseWriter,
+	status int,
+	contentType string,
+	response any,
+) {
+	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(response)
 }
