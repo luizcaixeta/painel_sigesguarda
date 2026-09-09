@@ -12,6 +12,7 @@ import (
 
 type BairroLister interface {
 	ListBairros(context.Context) ([]domain.Bairro, error)
+	ListBairrosGeoJSON(context.Context) ([]domain.BairroGeometry, error)
 }
 
 type BairrosHandler struct {
