@@ -83,7 +83,7 @@ func (repository *OcorrenciaRepository) ListOcorrencias(ctx context.Context, bat
 			occurrence.y
 		FROM gold.ocorrencias_mensais_ml_features AS occurrence
 		INNER JOIN gold.dim_bairros AS bairro
-			ON bairro.nome = occurrence.bairro
+			ON replace(bairro.bairro_id, '-', ' ') = occurrence.bairro
 		WHERE occurrence.batch_id = $1::uuid
 			AND (
 				COALESCE(cardinality($2::text[]), 0) = 0
