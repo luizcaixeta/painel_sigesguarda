@@ -10,6 +10,7 @@ import (
 
 func New(
 	readinessChecker handler.ReadinessChecker,
+	bairroLister handler.BairroLister,
 	queryTimeout time.Duration,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -19,6 +20,11 @@ func New(
 		mux,
 		"/readyz",
 		handler.NewReadinessHandler(readinessChecker, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/bairros",
+		handler.NewBairrosHandler(bairroLister, queryTimeout),
 	)
 	mux.HandleFunc("/", handler.NotFoundHandler)
 
