@@ -21,3 +21,8 @@ type CurrentBatch struct {
 	ID          string
 	DataThrough time.Time
 }
+
+type OcorrenciasResult struct {
+	DataThrough time.Time
+	Items       []Ocorrencia
+}
