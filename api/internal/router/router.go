@@ -29,6 +29,11 @@ func New(
 	)
 	registerGET(
 		mux,
+		"/api/bairros/geojson",
+		handler.NewBairrosGeoJSONHandler(bairroLister, queryTimeout),
+	)
+	registerGET(
+		mux,
 		"/api/categorias",
 		handler.NewCategoriasHandler(categoriaLister, queryTimeout),
 	)
