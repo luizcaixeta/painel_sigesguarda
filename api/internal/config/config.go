@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -61,6 +63,50 @@ func parseInt32(name string) (int32, error) {
 	return int32(value), nil
 }
 
+func buildDatabaseDSN() (string, error) {
+	host, err := parseString("SIGESGUARDA_DATABASE.HOST")
+	if err != nil {
+		return "", err
+	}
+
+	port, err := parseString("SIGESGUARDA_DATABASE.PORT")
+	if err != nil {
+		return "", err
+	}
+
+	user, err := parseString("SIGESGUARDA_DATABASE.USER")
+	if err != nil {
+		return "", err
+	}
+
+	password, err := parseString("SIGESGUARDA_DATABASE.PASSWORD")
+	if err != nil {
+		return "", err
+	}
+
+	name, err := parseString("SIGESGUARDA_DATABASE.NAME")
+	if err != nil {
+		return "", err
+	}
+
+	sslMode, err := parseString("SIGESGUARDA_DATABASE.SSL_MODE")
+	if err != nil {
+		return "", err
+	}
+
+	databaseURL := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, port),
+		Path:   name,
+	}
+	query := databaseURL.Query()
+	query.Set("sslmode", sslMode)
+	databaseURL.RawQuery = query.Encode()
+
+	return databaseURL.String(), nil
+}
+
 func Load() (Config, error) {
 	var cfg Config
 	var err error
@@ -95,7 +141,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.DatabaseDSN, err = parseString("SIGESGUARDA_DB_DSN")
+	cfg.DatabaseDSN, err = buildDatabaseDSN()
 	if err != nil {
 		return Config{}, err
 	}
