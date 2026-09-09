@@ -12,7 +12,9 @@ import (
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/config"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/database"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/router"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
 )
 
 func run() error {
@@ -38,7 +40,9 @@ func run() error {
 	defer pool.Close()
 
 	readinessChecker := database.NewReadinessChecker(pool)
-	httpHandler := router.New(readinessChecker, cfg.QueryTimeout)
+	bairroRepository := repositories.NewBairroRepository(pool)
+	bairroService := services.NewBairroService(bairroRepository)
+	httpHandler := router.New(readinessChecker, bairroService, cfg.QueryTimeout)
 
 	server := &http.Server{
 		Addr:              cfg.APIAddr,
