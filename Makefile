@@ -2,6 +2,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 -include .env
+-include api/.env
 
 GO_DIR ?= api
 GO_MAIN ?= ./cmd/server
