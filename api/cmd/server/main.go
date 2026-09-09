@@ -37,7 +37,8 @@ func run() error {
 	}
 	defer pool.Close()
 
-	httpHandler := router.New()
+	readinessChecker := database.NewReadinessChecker(pool)
+	httpHandler := router.New(readinessChecker, cfg.QueryTimeout)
 
 	server := &http.Server{
 		Addr:              cfg.APIAddr,
