@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/config"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/database"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
@@ -18,6 +19,10 @@ import (
 )
 
 func run() error {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
