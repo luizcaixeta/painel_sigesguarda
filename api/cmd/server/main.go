@@ -51,11 +51,16 @@ func run() error {
 	categoriaService := services.NewCategoriaService(categoriaRepository)
 	ocorrenciaRepository := repositories.NewOcorrenciaRepository(pool)
 	ocorrenciaService := services.NewOcorrenciaService(ocorrenciaRepository)
+	socioeconomicoRepository := repositories.NewSocioeconomicoRepository(pool)
+	indicadorService := services.NewIndicadorService(socioeconomicoRepository)
+	iqvService := services.NewIQVService(socioeconomicoRepository)
 	httpHandler := router.New(
 		readinessChecker,
 		bairroService,
 		categoriaService,
 		ocorrenciaService,
+		indicadorService,
+		iqvService,
 		cfg.QueryTimeout,
 	)
 
