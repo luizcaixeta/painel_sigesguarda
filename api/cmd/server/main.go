@@ -51,6 +51,8 @@ func run() error {
 	categoriaService := services.NewCategoriaService(categoriaRepository)
 	ocorrenciaRepository := repositories.NewOcorrenciaRepository(pool)
 	ocorrenciaService := services.NewOcorrenciaService(ocorrenciaRepository)
+	previsaoRepository := repositories.NewPrevisaoRepository(pool)
+	previsaoService := services.NewPrevisaoService(previsaoRepository)
 	socioeconomicoRepository := repositories.NewSocioeconomicoRepository(pool)
 	indicadorService := services.NewIndicadorService(socioeconomicoRepository)
 	iqvService := services.NewIQVService(socioeconomicoRepository)
@@ -59,6 +61,7 @@ func run() error {
 		bairroService,
 		categoriaService,
 		ocorrenciaService,
+		previsaoService,
 		indicadorService,
 		iqvService,
 		cfg.QueryTimeout,
