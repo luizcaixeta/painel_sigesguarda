@@ -13,6 +13,8 @@ func New(
 	bairroLister handler.BairroLister,
 	categoriaLister handler.CategoriaLister,
 	ocorrenciaLister handler.OcorrenciaLister,
+	indicadorLister handler.IndicadorLister,
+	iqvLister handler.IQVLister,
 	queryTimeout time.Duration,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -25,23 +27,38 @@ func New(
 	)
 	registerGET(
 		mux,
-		"/api/bairros",
+		"/api/v1/bairros",
 		handler.NewBairrosHandler(bairroLister, queryTimeout),
 	)
 	registerGET(
 		mux,
-		"/api/bairros/geojson",
+		"/api/v1/bairros/geojson",
 		handler.NewBairrosGeoJSONHandler(bairroLister, queryTimeout),
 	)
 	registerGET(
 		mux,
-		"/api/categorias",
+		"/api/v1/categorias",
 		handler.NewCategoriasHandler(categoriaLister, queryTimeout),
 	)
 	registerGET(
 		mux,
-		"/api/ocorrencias",
+		"/api/v1/ocorrencias",
 		handler.NewOcorrenciasHandler(ocorrenciaLister, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/v1/indicadores/catalogo",
+		handler.NewIndicadoresCatalogoHandler(indicadorLister, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/v1/indicadores",
+		handler.NewIndicadoresHandler(indicadorLister, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/v1/iqv",
+		handler.NewIQVHandler(iqvLister, queryTimeout),
 	)
 	mux.HandleFunc("/", handler.NotFoundHandler)
 
