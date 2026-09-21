@@ -13,6 +13,7 @@ func New(
 	bairroLister handler.BairroLister,
 	categoriaLister handler.CategoriaLister,
 	ocorrenciaLister handler.OcorrenciaLister,
+	previsaoLister handler.PrevisaoLister,
 	indicadorLister handler.IndicadorLister,
 	iqvLister handler.IQVLister,
 	queryTimeout time.Duration,
@@ -44,6 +45,11 @@ func New(
 		mux,
 		"/api/v1/ocorrencias",
 		handler.NewOcorrenciasHandler(ocorrenciaLister, queryTimeout),
+	)
+	registerGET(
+		mux,
+		"/api/v1/previsoes",
+		handler.NewPrevisoesHandler(previsaoLister, queryTimeout),
 	)
 	registerGET(
 		mux,
