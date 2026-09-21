@@ -48,6 +48,8 @@ tags:
     description: Contagens mensais observadas do batch Gold corrente.
   - name: Previsoes
     description: Publicacao persistida de X + 1 vinculada ao batch Gold corrente.
+  - name: Indicadores
+    description: Indicadores socioeconomicos anuais publicados na Gold.
   - name: IQV
     description: Indice de Qualidade de Vida anual publicado na Gold.
 
@@ -266,6 +268,67 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/indicadores/catalogo:
+    get:
+      tags: [Indicadores]
+      summary: Lista o catalogo de indicadores socioeconomicos
+      description: |
+        Retorna os seis indicadores que compoem o IQV, ordenados pela ordem de
+        exibicao publicada e, como desempate, pelo codigo.
+      operationId: listIndicadoresCatalogo
+      responses:
+        "200":
+          description: Catalogo dos indicadores publicados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndicadoresCatalogoResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/indicadores:
+    get:
+      tags: [Indicadores]
+      summary: Consulta indicadores socioeconomicos anuais
+      description: |
+        Consulta os valores publicados no batch `socioeconomic_features`
+        corrente. Sem periodo, usa o maior ano realmente publicado nesse
+        batch. A ordenacao e por ano, ordem de exibicao e codigo do indicador,
+        nome do bairro e `bairro_id`, todos crescentes.
+      operationId: listIndicadores
+      parameters:
+        - $ref: "#/components/parameters/BairrosFiltro"
+        - $ref: "#/components/parameters/IndicadoresFiltro"
+        - $ref: "#/components/parameters/AnosFiltro"
+        - $ref: "#/components/parameters/AnoDe"
+        - $ref: "#/components/parameters/AnoAte"
+      responses:
+        "200":
+          description: Valores dos indicadores para os filtros aplicados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndicadoresResponse"
+              example:
+                meta:
+                  total_items: 1
+                data:
+                  - bairro_id: centro
+                    indicador: PCT_ALFABETIZACAO_15_MAIS
+                    ano: 2022
+                    valor: 98.12
+                    tipo_estimativa: observado
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "503":
+          $ref: "#/components/responses/DataUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/iqv:
     get:
       tags: [IQV]
@@ -356,6 +419,25 @@ components:
           value: [CRIME_PATRIMONIAL]
         variasCategorias:
           value: [CRIME_PATRIMONIAL, CRIME_VIOLENTO]
+
+    IndicadoresFiltro:
+      name: indicador
+      in: query
+      explode: true
+      description: |
+        Um ou mais codigos exatos retornados por
+        `GET /api/v1/indicadores/catalogo`. Repita o parametro para selecionar
+        varios indicadores. Quando omitido, inclui os seis indicadores. Lista
+        vazia ou valor duplicado retorna `400 INVALID_ARGUMENT`; codigo
+        inexistente retorna `400 INVALID_FILTER`.
+      schema:
+        type: array
+        minItems: 1
+        maxItems: 6
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/IndicadorCodigo"
+      example: [PCT_ALFABETIZACAO_15_MAIS]
 
     MesesFiltro:
       name: mes
@@ -610,7 +692,7 @@ components:
       type: integer
       format: int32
       minimum: 2009
-      maximum: 2028
+      maximum: 2050
       description: Ano calendario representado como inteiro.
       example: 2022
 
@@ -625,6 +707,18 @@ components:
         - CRIME_ORDEM_PUBLICA
         - CRIME_DROGAS_SUBSTANCIAS
       example: CRIME_PATRIMONIAL
+
+    IndicadorCodigo:
+      type: string
+      description: Codigo estavel de um dos seis indicadores publicados na Gold.
+      enum:
+        - RENDIMENTO_MEDIO_RESPONSAVEL_SM
+        - PCT_ALFABETIZACAO_15_MAIS
+        - PCT_SEM_BANHEIRO_SANITARIO
+        - PCT_ESGOTAMENTO_PRECARIO
+        - PCT_SEM_REDE_GERAL_AGUA
+        - PCT_LIXO_DESTINO_INADEQUADO
+      example: PCT_ALFABETIZACAO_15_MAIS
 
     TipoEstimativa:
       type: string
@@ -699,6 +793,68 @@ components:
           maxItems: 6
           items:
             $ref: "#/components/schemas/Categoria"
+
+    Indicador:
+      type: object
+      additionalProperties: false
+      required: [codigo, nome, unidade]
+      properties:
+        codigo:
+          $ref: "#/components/schemas/IndicadorCodigo"
+        nome:
+          type: string
+          minLength: 1
+          example: Alfabetizacao da populacao com 15 anos ou mais
+        unidade:
+          type: string
+          minLength: 1
+          example: percentual
+
+    IndicadoresCatalogoResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/TotalItemsMeta"
+        data:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/Indicador"
+
+    IndicadorValor:
+      type: object
+      additionalProperties: false
+      required: [bairro_id, indicador, ano, valor, tipo_estimativa]
+      properties:
+        bairro_id:
+          $ref: "#/components/schemas/BairroId"
+        indicador:
+          $ref: "#/components/schemas/IndicadorCodigo"
+        ano:
+          $ref: "#/components/schemas/Ano"
+        valor:
+          type: number
+          format: double
+          minimum: 0
+          description: Valor preservado exatamente como publicado na Gold.
+          example: 98.12
+        tipo_estimativa:
+          $ref: "#/components/schemas/TipoEstimativa"
+
+    IndicadoresResponse:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/TotalItemsMeta"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IndicadorValor"
 
     OcorrenciasMeta:
       type: object
