@@ -249,6 +249,7 @@ paths:
               example:
                 meta:
                   total_items: 1
+                  forecast_run_id: "a9df8fb8-2f0d-442d-8ea6-66dc2ad334fb"
                   gold_batch_id: "7b24e0ec-b64f-47be-a2e0-4c06e71f42c9"
                   data_through: "2026-07"
                   model_name: SIGESGUARDA_XGBoostRegressor
@@ -909,6 +910,7 @@ components:
       additionalProperties: false
       required:
         - total_items
+        - forecast_run_id
         - gold_batch_id
         - data_through
         - model_name
@@ -923,6 +925,11 @@ components:
           minimum: 0
           description: Quantidade de itens presentes em `data` apos os filtros.
           example: 450
+        forecast_run_id:
+          type: string
+          format: uuid
+          description: ID da publicacao de previsao selecionada.
+          example: "a9df8fb8-2f0d-442d-8ea6-66dc2ad334fb"
         gold_batch_id:
           type: string
           format: uuid
