@@ -3,16 +3,11 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
-)
-
-var (
-	ErrInvalidBairroFilter    = errors.New("invalid bairro filter")
-	ErrInvalidCategoriaFilter = errors.New("invalid categoria filter")
 )
 
 type OcorrenciaRepository interface {
@@ -36,10 +31,10 @@ func NewOcorrenciaService(repository OcorrenciaRepository) *OcorrenciaService {
 func (service *OcorrenciaService) ListOcorrencias(ctx context.Context, filter domain.OcorrenciasFilter) (domain.OcorrenciasResult, error) {
 	batch, err := service.repository.CurrentMLBatch(ctx)
 	if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-		return domain.OcorrenciasResult{}, ErrDataNotReady
+		return domain.OcorrenciasResult{}, errs.New(errs.KindCurrentGoldBatchNotReady)
 	}
 	if err != nil {
-		return domain.OcorrenciasResult{}, fmt.Errorf("get current ML batch: %w", err)
+		return domain.OcorrenciasResult{}, wrapRepositoryError("get current ML batch", err)
 	}
 
 	bairrosExist, categoriasExist, err := service.repository.FiltersExist(
@@ -48,13 +43,13 @@ func (service *OcorrenciaService) ListOcorrencias(ctx context.Context, filter do
 		filter.Categorias,
 	)
 	if err != nil {
-		return domain.OcorrenciasResult{}, fmt.Errorf("validate filters: %w", err)
+		return domain.OcorrenciasResult{}, wrapRepositoryError("validate filters", err)
 	}
 	if !bairrosExist {
-		return domain.OcorrenciasResult{}, ErrInvalidBairroFilter
+		return domain.OcorrenciasResult{}, errs.New(errs.KindInvalidBairroFilter)
 	}
 	if !categoriasExist {
-		return domain.OcorrenciasResult{}, ErrInvalidCategoriaFilter
+		return domain.OcorrenciasResult{}, errs.New(errs.KindInvalidCategoriaFilter)
 	}
 
 	if len(filter.Meses) == 0 && filter.De == nil {
@@ -67,7 +62,7 @@ func (service *OcorrenciaService) ListOcorrencias(ctx context.Context, filter do
 		filter,
 	)
 	if err != nil {
-		return domain.OcorrenciasResult{}, fmt.Errorf("list occurrences: %w", err)
+		return domain.OcorrenciasResult{}, wrapRepositoryError("list occurrences", err)
 	}
 
 	return domain.OcorrenciasResult{
