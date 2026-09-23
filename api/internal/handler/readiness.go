@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/database"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type ReadinessChecker interface {
@@ -46,14 +47,15 @@ func (handler *ReadinessHandler) ServeHTTP(
 	defer cancel()
 
 	if err := handler.checker.Check(ctx); err != nil {
-		code := "DATABASE_UNAVAILABLE"
-		message := "database unavailable"
 		if errors.Is(err, database.ErrDataNotReady) {
-			code = "DATA_NOT_READY"
-			message = "data contract unavailable"
+			WriteError(w, r, errs.Wrap(errs.KindDataContractNotReady, "check readiness", err))
+			return
 		}
-
-		WriteError(w, r, http.StatusServiceUnavailable, code, message)
+		kind := errs.KindInternal
+		if database.IsUnavailable(err) {
+			kind = errs.KindDatabaseUnavailable
+		}
+		WriteError(w, r, errs.Wrap(kind, "check readiness", err))
 		return
 	}
 
