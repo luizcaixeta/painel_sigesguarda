@@ -3,13 +3,11 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
 )
-
-var ErrInvalidIndicadorFilter = errors.New("invalid indicador filter")
 
 type IndicadorRepository interface {
 	CurrentSocioeconomicBatch(context.Context) (domain.CurrentBatch, error)
@@ -30,10 +28,10 @@ func NewIndicadorService(repository IndicadorRepository) *IndicadorService {
 func (service *IndicadorService) ListIndicadores(ctx context.Context) ([]domain.Indicador, error) {
 	indicadores, err := service.repository.ListIndicadores(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list indicadores: %w", err)
+		return nil, wrapRepositoryError("list indicadores", err)
 	}
 	if len(indicadores) != 6 {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindIndicadorCatalogNotReady)
 	}
 	return indicadores, nil
 }
@@ -44,10 +42,10 @@ func (service *IndicadorService) ListIndicadorValores(
 ) ([]domain.IndicadorValor, error) {
 	batch, err := service.repository.CurrentSocioeconomicBatch(ctx)
 	if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindCurrentSocioeconomicGoldBatchNotReady)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get current socioeconomic batch: %w", err)
+		return nil, wrapRepositoryError("get current socioeconomic batch", err)
 	}
 
 	bairrosExist, indicadoresExist, err := service.repository.FiltersExist(
@@ -56,29 +54,29 @@ func (service *IndicadorService) ListIndicadorValores(
 		filter.Indicadores,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("validate indicator filters: %w", err)
+		return nil, wrapRepositoryError("validate indicator filters", err)
 	}
 	if !bairrosExist {
-		return nil, ErrInvalidBairroFilter
+		return nil, errs.New(errs.KindInvalidBairroFilter)
 	}
 	if !indicadoresExist {
-		return nil, ErrInvalidIndicadorFilter
+		return nil, errs.New(errs.KindInvalidIndicadorFilter)
 	}
 
 	if len(filter.Anos) == 0 && filter.De == nil {
 		latestYear, err := service.repository.LatestAnnualYear(ctx, batch.ID)
 		if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-			return nil, ErrDataNotReady
+			return nil, errs.New(errs.KindCurrentSocioeconomicGoldBatchNotReady)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("get latest socioeconomic year: %w", err)
+			return nil, wrapRepositoryError("get latest socioeconomic year", err)
 		}
 		filter.Anos = []int32{latestYear}
 	}
 
 	items, err := service.repository.ListIndicadorValores(ctx, batch.ID, filter)
 	if err != nil {
-		return nil, fmt.Errorf("list indicator values: %w", err)
+		return nil, wrapRepositoryError("list indicator values", err)
 	}
 	return items, nil
 }
