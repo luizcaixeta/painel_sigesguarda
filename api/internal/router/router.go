@@ -68,7 +68,8 @@ func New(
 	)
 	mux.HandleFunc("/", handler.NotFoundHandler)
 
-	return middleware.RequestID(mux)
+	recovered := middleware.Recovery(handler.WriteError, mux)
+	return middleware.RequestID(middleware.SecurityHeaders(recovered))
 }
 
 func registerGET(mux *http.ServeMux, path string, routeHandler http.Handler) {
