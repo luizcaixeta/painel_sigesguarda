@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type IQVLister interface {
@@ -38,7 +39,7 @@ func NewIQVHandler(lister IQVLister, timeout time.Duration) *IQVHandler {
 func (handler *IQVHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseIQVQuery(r.URL.Query())
 	if err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid query parameter")
+		WriteError(w, r, errs.Wrap(errs.KindInvalidArgument, "parse IQV query", err))
 		return
 	}
 
@@ -46,7 +47,7 @@ func (handler *IQVHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	items, err := handler.lister.ListIQV(ctx, filter)
 	if err != nil {
-		writeSocioeconomicError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 
