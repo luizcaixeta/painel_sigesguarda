@@ -2,14 +2,13 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
-	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type PrevisaoLister interface {
@@ -55,13 +54,7 @@ func NewPrevisoesHandler(lister PrevisaoLister, timeout time.Duration) *Previsoe
 func (handler *PrevisoesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filter, err := parsePrevisoesQuery(r.URL.Query())
 	if err != nil {
-		WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"INVALID_ARGUMENT",
-			"invalid query parameter",
-		)
+		WriteError(w, r, errs.Wrap(errs.KindInvalidArgument, "parse previsoes query", err))
 		return
 	}
 
@@ -70,7 +63,7 @@ func (handler *PrevisoesHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	result, err := handler.lister.ListPrevisoes(ctx, filter)
 	if err != nil {
-		handler.writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -134,25 +127,4 @@ func parsePrevisoesQuery(query url.Values) (domain.PrevisoesFilter, error) {
 		BairroIDs:  bairroIDs,
 		Categorias: categorias,
 	}, nil
-}
-
-func (handler *PrevisoesHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, services.ErrInvalidBairroFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown bairro_id")
-	case errors.Is(err, services.ErrInvalidCategoriaFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown categoria")
-	case errors.Is(err, services.ErrDataNotReady):
-		WriteError(w, r, http.StatusServiceUnavailable, "DATA_NOT_READY", "current Gold batch unavailable")
-	case errors.Is(err, services.ErrForecastNotReady):
-		WriteError(
-			w,
-			r,
-			http.StatusServiceUnavailable,
-			"FORECAST_NOT_READY",
-			"compatible complete forecast unavailable",
-		)
-	default:
-		WriteError(w, r, http.StatusServiceUnavailable, "DATABASE_UNAVAILABLE", "database unavailable")
-	}
 }
