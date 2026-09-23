@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
 )
 
@@ -30,34 +30,34 @@ func (service *IQVService) ListIQV(
 ) ([]domain.IQV, error) {
 	batch, err := service.repository.CurrentSocioeconomicBatch(ctx)
 	if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindCurrentSocioeconomicGoldBatchNotReady)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get current socioeconomic batch: %w", err)
+		return nil, wrapRepositoryError("get current socioeconomic batch", err)
 	}
 
 	bairrosExist, _, err := service.repository.FiltersExist(ctx, filter.BairroIDs, nil)
 	if err != nil {
-		return nil, fmt.Errorf("validate IQV filters: %w", err)
+		return nil, wrapRepositoryError("validate IQV filters", err)
 	}
 	if !bairrosExist {
-		return nil, ErrInvalidBairroFilter
+		return nil, errs.New(errs.KindInvalidBairroFilter)
 	}
 
 	if len(filter.Anos) == 0 && filter.De == nil {
 		latestYear, err := service.repository.LatestAnnualYear(ctx, batch.ID)
 		if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-			return nil, ErrDataNotReady
+			return nil, errs.New(errs.KindCurrentSocioeconomicGoldBatchNotReady)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("get latest socioeconomic year: %w", err)
+			return nil, wrapRepositoryError("get latest socioeconomic year", err)
 		}
 		filter.Anos = []int32{latestYear}
 	}
 
 	items, err := service.repository.ListIQV(ctx, batch.ID, filter)
 	if err != nil {
-		return nil, fmt.Errorf("list IQV: %w", err)
+		return nil, wrapRepositoryError("list IQV", err)
 	}
 	return items, nil
 }
