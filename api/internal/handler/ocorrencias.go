@@ -2,12 +2,11 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
-	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type OcorrenciaLister interface {
@@ -49,13 +48,7 @@ func NewOcorrenciasHandler(lister OcorrenciaLister, timeout time.Duration) *Ocor
 func (handler *OcorrenciasHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseOcorrenciasQuery(r.URL.Query())
 	if err != nil {
-		WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"INVALID_ARGUMENT",
-			"invalid query parameter",
-		)
+		WriteError(w, r, errs.Wrap(errs.KindInvalidArgument, "parse ocorrencias query", err))
 		return
 	}
 
@@ -64,7 +57,7 @@ func (handler *OcorrenciasHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 	result, err := handler.lister.ListOcorrencias(ctx, filter)
 	if err != nil {
-		handler.writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -85,17 +78,4 @@ func (handler *OcorrenciasHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		},
 		Data: data,
 	})
-}
-
-func (handler *OcorrenciasHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, services.ErrInvalidBairroFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown bairro_id")
-	case errors.Is(err, services.ErrInvalidCategoriaFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown categoria")
-	case errors.Is(err, services.ErrDataNotReady):
-		WriteError(w, r, http.StatusServiceUnavailable, "DATA_NOT_READY", "current Gold batch unavailable")
-	default:
-		WriteError(w, r, http.StatusServiceUnavailable, "DATABASE_UNAVAILABLE", "database unavailable")
-	}
 }
