@@ -1,24 +1,16 @@
 package handler
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
+)
 
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
-	WriteError(
-		w,
-		r,
-		http.StatusNotFound,
-		"NOT_FOUND",
-		"route not found",
-	)
+	WriteError(w, r, errs.New(errs.KindRouteNotFound))
 }
 
 func MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow", http.MethodGet)
-	WriteError(
-		w,
-		r,
-		http.StatusMethodNotAllowed,
-		"METHOD_NOT_ALLOWED",
-		"method not allowed",
-	)
+	WriteError(w, r, errs.New(errs.KindMethodNotAllowed))
 }
