@@ -3,11 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
-	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type BairrosGeoJSONHandler struct {
@@ -35,13 +34,7 @@ func NewBairrosGeoJSONHandler(lister BairroLister, timeout time.Duration) *Bairr
 
 func (handler *BairrosGeoJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Query()) != 0 {
-		WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"INVALID_ARGUMENT",
-			"invalid query parameter",
-		)
+		WriteError(w, r, errs.New(errs.KindInvalidArgument))
 		return
 	}
 
@@ -50,24 +43,7 @@ func (handler *BairrosGeoJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	bairros, err := handler.lister.ListBairrosGeoJSON(ctx)
 	if err != nil {
-		if errors.Is(err, services.ErrDataNotReady) {
-			WriteError(
-				w,
-				r,
-				http.StatusServiceUnavailable,
-				"DATA_NOT_READY",
-				"bairro geometry catalog unavailable",
-			)
-			return
-		}
-
-		WriteError(
-			w,
-			r,
-			http.StatusServiceUnavailable,
-			"DATABASE_UNAVAILABLE",
-			"database unavailable",
-		)
+		WriteError(w, r, err)
 		return
 	}
 
