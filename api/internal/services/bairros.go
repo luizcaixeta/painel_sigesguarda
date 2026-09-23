@@ -2,13 +2,10 @@ package services
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
-
-var ErrDataNotReady = errors.New("data not ready")
 
 type BairroRepository interface {
 	ListBairros(context.Context) ([]domain.Bairro, error)
@@ -26,11 +23,11 @@ func NewBairroService(repository BairroRepository) *BairroService {
 func (service *BairroService) ListBairros(ctx context.Context) ([]domain.Bairro, error) {
 	bairros, err := service.repository.ListBairros(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list bairros: %w", err)
+		return nil, wrapRepositoryError("list bairros", err)
 	}
 
 	if len(bairros) != 75 {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindBairroCatalogNotReady)
 	}
 
 	return bairros, nil
@@ -39,11 +36,11 @@ func (service *BairroService) ListBairros(ctx context.Context) ([]domain.Bairro,
 func (service *BairroService) ListBairrosGeoJSON(ctx context.Context) ([]domain.BairroGeometry, error) {
 	bairros, err := service.repository.ListBairrosGeoJSON(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list bairro geometries: %w", err)
+		return nil, wrapRepositoryError("list bairro geometries", err)
 	}
 
 	if len(bairros) != 75 {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindBairroGeometryCatalogNotReady)
 	}
 
 	return bairros, nil
