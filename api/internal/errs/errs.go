@@ -19,6 +19,7 @@ const (
 	KindBairroCatalogNotReady
 	KindBairroGeometryCatalogNotReady
 	KindCategoriaCatalogNotReady
+	KindIndicadorCatalogNotReady
 	KindCurrentGoldBatchNotReady
 	KindCurrentSocioeconomicGoldBatchNotReady
 	KindForecastNotReady
@@ -165,6 +166,12 @@ func HTTPDefinitionFor(kind Kind) HTTPDefinition {
 			Status:  http.StatusServiceUnavailable,
 			Code:    CodeDataNotReady,
 			Message: "categoria catalog unavailable",
+		}
+	case KindIndicadorCatalogNotReady:
+		return HTTPDefinition{
+			Status:  http.StatusServiceUnavailable,
+			Code:    CodeDataNotReady,
+			Message: "indicador catalog unavailable",
 		}
 	case KindCurrentGoldBatchNotReady:
 		return HTTPDefinition{
