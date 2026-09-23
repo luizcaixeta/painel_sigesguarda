@@ -2,12 +2,11 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
-	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type CategoriaLister interface {
@@ -38,13 +37,7 @@ func NewCategoriasHandler(lister CategoriaLister, timeout time.Duration) *Catego
 
 func (handler *CategoriasHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Query()) != 0 {
-		WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"INVALID_ARGUMENT",
-			"invalid query parameter",
-		)
+		WriteError(w, r, errs.New(errs.KindInvalidArgument))
 		return
 	}
 
@@ -53,24 +46,7 @@ func (handler *CategoriasHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 
 	categorias, err := handler.lister.ListCategorias(ctx)
 	if err != nil {
-		if errors.Is(err, services.ErrDataNotReady) {
-			WriteError(
-				w,
-				r,
-				http.StatusServiceUnavailable,
-				"DATA_NOT_READY",
-				"categoria catalog unavailable",
-			)
-			return
-		}
-
-		WriteError(
-			w,
-			r,
-			http.StatusServiceUnavailable,
-			"DATABASE_UNAVAILABLE",
-			"database unavailable",
-		)
+		WriteError(w, r, err)
 		return
 	}
 
