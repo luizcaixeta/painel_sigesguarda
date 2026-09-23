@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/requestcontext"
 )
 
@@ -12,9 +14,9 @@ type ErrorResponse struct {
 }
 
 type APIError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	RequestID string `json:"request_id"`
+	Code      errs.Code `json:"code"`
+	Message   string    `json:"message"`
+	RequestID string    `json:"request_id"`
 }
 
 func WriteJSON(w http.ResponseWriter, status int, response any) {
@@ -39,15 +41,27 @@ func writeJSON(
 func WriteError(
 	w http.ResponseWriter,
 	r *http.Request,
-	status int,
-	code string,
-	message string,
+	err error,
 ) {
-	WriteJSON(w, status, ErrorResponse{
+	definition := errs.Resolve(err)
+	requestID := requestcontext.RequestID(r.Context())
+
+	if definition.Status >= http.StatusInternalServerError {
+		slog.Error(
+			"request failed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", definition.Status,
+			"request_id", requestID,
+			"error", err,
+		)
+	}
+
+	WriteJSON(w, definition.Status, ErrorResponse{
 		Error: APIError{
-			Code:      code,
-			Message:   message,
-			RequestID: requestcontext.RequestID(r.Context()),
+			Code:      definition.Code,
+			Message:   definition.Message,
+			RequestID: requestID,
 		},
 	})
 }
