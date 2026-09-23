@@ -3,14 +3,12 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/repositories"
 )
-
-var ErrForecastNotReady = errors.New("forecast publication not ready")
 
 type PrevisaoRepository interface {
 	CurrentMLBatch(context.Context) (domain.CurrentBatch, error)
@@ -42,10 +40,10 @@ func (service *PrevisaoService) ListPrevisoes(
 ) (domain.PrevisoesResult, error) {
 	batch, err := service.repository.CurrentMLBatch(ctx)
 	if errors.Is(err, repositories.ErrCurrentBatchNotFound) {
-		return domain.PrevisoesResult{}, ErrDataNotReady
+		return domain.PrevisoesResult{}, errs.New(errs.KindCurrentGoldBatchNotReady)
 	}
 	if err != nil {
-		return domain.PrevisoesResult{}, fmt.Errorf("get current ML batch: %w", err)
+		return domain.PrevisoesResult{}, wrapRepositoryError("get current ML batch", err)
 	}
 
 	forecastMonth := time.Date(
@@ -65,10 +63,10 @@ func (service *PrevisaoService) ListPrevisoes(
 		forecastMonth,
 	)
 	if errors.Is(err, repositories.ErrForecastPublicationNotFound) {
-		return domain.PrevisoesResult{}, ErrForecastNotReady
+		return domain.PrevisoesResult{}, errs.New(errs.KindForecastNotReady)
 	}
 	if err != nil {
-		return domain.PrevisoesResult{}, fmt.Errorf("get current forecast publication: %w", err)
+		return domain.PrevisoesResult{}, wrapRepositoryError("get current forecast publication", err)
 	}
 
 	bairrosExist, categoriasExist, err := service.repository.FiltersExist(
@@ -77,18 +75,18 @@ func (service *PrevisaoService) ListPrevisoes(
 		filter.Categorias,
 	)
 	if err != nil {
-		return domain.PrevisoesResult{}, fmt.Errorf("validate forecast filters: %w", err)
+		return domain.PrevisoesResult{}, wrapRepositoryError("validate forecast filters", err)
 	}
 	if !bairrosExist {
-		return domain.PrevisoesResult{}, ErrInvalidBairroFilter
+		return domain.PrevisoesResult{}, errs.New(errs.KindInvalidBairroFilter)
 	}
 	if !categoriasExist {
-		return domain.PrevisoesResult{}, ErrInvalidCategoriaFilter
+		return domain.PrevisoesResult{}, errs.New(errs.KindInvalidCategoriaFilter)
 	}
 
 	items, err := service.repository.ListForecastItems(ctx, publication, filter)
 	if err != nil {
-		return domain.PrevisoesResult{}, fmt.Errorf("list forecast items: %w", err)
+		return domain.PrevisoesResult{}, wrapRepositoryError("list forecast items", err)
 	}
 
 	return domain.PrevisoesResult{
