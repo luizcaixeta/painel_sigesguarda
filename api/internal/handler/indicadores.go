@@ -2,14 +2,13 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
-	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type IndicadorLister interface {
@@ -64,7 +63,7 @@ func NewIndicadoresHandler(lister IndicadorLister, timeout time.Duration) *Indic
 
 func (handler *IndicadoresCatalogoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Query()) != 0 {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid query parameter")
+		WriteError(w, r, errs.New(errs.KindInvalidArgument))
 		return
 	}
 
@@ -72,7 +71,7 @@ func (handler *IndicadoresCatalogoHandler) ServeHTTP(w http.ResponseWriter, r *h
 	defer cancel()
 	indicadores, err := handler.lister.ListIndicadores(ctx)
 	if err != nil {
-		writeSocioeconomicError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -93,7 +92,7 @@ func (handler *IndicadoresCatalogoHandler) ServeHTTP(w http.ResponseWriter, r *h
 func (handler *IndicadoresHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseIndicadoresQuery(r.URL.Query())
 	if err != nil {
-		WriteError(w, r, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid query parameter")
+		WriteError(w, r, errs.Wrap(errs.KindInvalidArgument, "parse indicadores query", err))
 		return
 	}
 
@@ -101,7 +100,7 @@ func (handler *IndicadoresHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	items, err := handler.lister.ListIndicadorValores(ctx, filter)
 	if err != nil {
-		writeSocioeconomicError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -140,17 +139,4 @@ func parseIndicadoresQuery(query url.Values) (domain.IndicadoresFilter, error) {
 		return domain.IndicadoresFilter{}, err
 	}
 	return domain.IndicadoresFilter{AnnualFilter: annual, Indicadores: indicadores}, nil
-}
-
-func writeSocioeconomicError(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, services.ErrInvalidBairroFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown bairro_id")
-	case errors.Is(err, services.ErrInvalidIndicadorFilter):
-		WriteError(w, r, http.StatusBadRequest, "INVALID_FILTER", "unknown indicador")
-	case errors.Is(err, services.ErrDataNotReady):
-		WriteError(w, r, http.StatusServiceUnavailable, "DATA_NOT_READY", "current socioeconomic Gold batch unavailable")
-	default:
-		WriteError(w, r, http.StatusServiceUnavailable, "DATABASE_UNAVAILABLE", "database unavailable")
-	}
 }
