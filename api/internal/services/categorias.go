@@ -2,9 +2,9 @@ package services
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/domain"
+	"github.com/luizcaixeta/painel_sigesguarda/api/internal/errs"
 )
 
 type CategoriaRepository interface {
@@ -24,11 +24,11 @@ func (service *CategoriaService) ListCategorias(
 ) ([]domain.Categoria, error) {
 	categorias, err := service.repository.ListCategorias(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list categorias: %w", err)
+		return nil, wrapRepositoryError("list categorias", err)
 	}
 
 	if len(categorias) != 6 {
-		return nil, ErrDataNotReady
+		return nil, errs.New(errs.KindCategoriaCatalogNotReady)
 	}
 
 	return categorias, nil
