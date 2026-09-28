@@ -6,9 +6,16 @@ dependencies = [
     "numpy>=2.0",
     "psycopg[binary]>=3.2.0",
     "requests>=2.32.0",
+    "protego>=0.6.2",
     "pandas>=2.0",
     "pyarrow>=16.0",
     "mlflow==3.13.0",
     "sqlalchemy>=2.0",
     "xgboost>=3.4.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.11",
 ]
