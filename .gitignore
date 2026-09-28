@@ -1,4 +1,11 @@
 __pycache__/
+ml_pipeline/src/real_estate 
+ml_pipeline/tests/conftest.py
+ml_pipeline/tests/test_real_estate_adapters.py
+ml_pipeline/tests/test_real_estate_http_runner.py
+ml_pipeline/tests/test_real_estate_migrations.py
+ml_pipeline/tests/test_real_estate_normalize.py
+ml_pipeline/tests/test_real_estate_sitemap_robots.py
 sigesguarda_ml_pipeline.egg-info/
 build/
 .venv/
