@@ -15,6 +15,7 @@ steps ?= 1
 
 SIGESGUARDA_DATABASE.SSL_MODE ?= disable
 SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATABASE.PASSWORD)@$(SIGESGUARDA_DATABASE.HOST):$(SIGESGUARDA_DATABASE.PORT)/$(SIGESGUARDA_DATABASE.NAME)?sslmode=$(SIGESGUARDA_DATABASE.SSL_MODE)
+export SIGESGUARDA_DB_DSN
 
 .PHONY: help lint test check run \
 		python-lint python-test \
@@ -38,7 +39,8 @@ SIGESGUARDA_DB_DSN ?=postgres://$(SIGESGUARDA_DATABASE.USER):$(SIGESGUARDA_DATAB
 		gold-load-ml-features \
 		train \
 		load_future_features \
-		publish_forecast
+		publish_forecast \
+		real-estate-crawl
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "Available commands:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -150,3 +152,6 @@ load_future_features: ## Load features for month + 1
 
 publish_forecast: ## Returns the model's forecasts for the last month + 1
 	cd $(PY_DIR) && $(PYTHON) src/modeling/publish_forecast.py 
+
+real-estate-crawl: ## Crawl listings (start with args="--dry-run --limit 10")
+	cd $(PY_DIR) && PYTHONPATH=src $(PYTHON) -m real_estate.runner $(args)
