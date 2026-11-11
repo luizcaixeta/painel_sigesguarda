@@ -18,6 +18,8 @@ import (
 	"github.com/luizcaixeta/painel_sigesguarda/api/internal/services"
 )
 
+const maxHeaderBytes = 64 << 10
+
 func run() error {
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("load .env: %w", err)
@@ -74,6 +76,7 @@ func run() error {
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
 
 	shutdownSignal, stop := signal.NotifyContext(
