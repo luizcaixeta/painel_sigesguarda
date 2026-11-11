@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: API do Painel SIGESGUARDA
-  version: 1.0.0
+  version: 1.0.1
   description: |
     API REST somente de leitura para o dashboard territorial dos 75 bairros de
     Curitiba.
@@ -18,18 +18,45 @@ info:
     metadados do modelo fazem parte da propria publicacao.
 
     Competencias mensais sao representadas por `YYYY-MM` e anos por numeros
-    inteiros. Os filtros repetiveis `bairro_id`, `categoria`, `mes` e `ano`
-    usam query parameters repetidos e correspondencia exata de codigo ou
-    periodo. Parametros desconhecidos sao rejeitados com
-    `400 INVALID_ARGUMENT`.
+    inteiros. Os filtros repetiveis `bairro_id`, `categoria`, `indicador`,
+    `mes` e `ano` usam query parameters repetidos
+    (`?bairro_id=centro&bairro_id=batel`) e correspondencia exata, sensivel a
+    maiusculas, de codigo ou periodo. Os parametros de valor unico (`de`,
+    `ate` e `ordem`) podem aparecer no maximo uma vez.
 
-    Rotas inexistentes retornam `404 NOT_FOUND` e metodos nao permitidos
-    retornam `405 METHOD_NOT_ALLOWED`, ambos usando o envelope `ErrorResponse`.
+    Regras gerais de validacao de query, todas com `400 INVALID_ARGUMENT` e a
+    mensagem publica fixa `invalid query parameter`: parametro desconhecido;
+    parametro presente com valor vazio (`?bairro_id=`); valor duplicado em
+    filtro repetivel; mais valores que o maximo do filtro; parametro de valor
+    unico repetido; formato de competencia ou ano invalido; combinacao de
+    periodo invalida. Codigos sintaticamente aceitos, mas inexistentes na
+    Gold, retornam `400 INVALID_FILTER`.
+
+    Os endpoints de catalogo e de mapa nao aceitam nenhum query parameter.
+    Os endpoints de saude (`/healthz` e `/readyz`) ignoram a query string.
+
+    Rotas inexistentes, inclusive com barra final (`/api/v1/bairros/`),
+    retornam `404 NOT_FOUND`. Todos os paths aceitam somente `GET`; qualquer
+    outro metodo, inclusive `HEAD` e `OPTIONS`, retorna
+    `405 METHOD_NOT_ALLOWED` com o header `Allow: GET`. Ambos usam o envelope
+    `ErrorResponse`.
+
+    Toda resposta, de sucesso ou de erro, inclui o header `X-Request-ID` e os
+    headers de seguranca `Content-Security-Policy: default-src 'none';
+    frame-ancestors 'none'`, `Referrer-Policy: no-referrer`,
+    `X-Content-Type-Options: nosniff` e `X-Frame-Options: DENY`. O cliente
+    pode enviar o proprio `X-Request-ID`; valores invalidos sao substituidos
+    por um identificador gerado pelo servidor.
+
+    Erros `503` indicam indisponibilidade temporaria do PostgreSQL ou dos
+    dados publicados. Erros `500` nunca expoem SQL, DSN, stack trace ou
+    detalhes internos.
 
     Todos os resultados possuem ordenacao deterministica, descrita em cada
     operacao. Respostas de dados usam o envelope `meta`/`data`, exceto o
-    GeoJSON, que retorna uma `FeatureCollection` diretamente. Nao ha paginacao
-    no MVP.
+    GeoJSON, que retorna uma `FeatureCollection` diretamente. Filtros validos
+    sem correspondencia retornam `200` com `data` vazio. Nao ha paginacao no
+    MVP.
   contact:
     name: Painel SIGESGUARDA
 
@@ -57,39 +84,54 @@ x-reject-unknown-query-parameters: true
 
 paths:
   /healthz:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Saude]
       summary: Verifica se o processo HTTP esta vivo
       description: |
         Nao consulta o PostgreSQL nem qualquer outra dependencia externa. Uma
         resposta `200` confirma apenas que o processo HTTP esta atendendo.
+        A query string e ignorada.
       operationId: getHealth
       responses:
         "200":
           description: Processo HTTP vivo.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
               example:
                 status: ok
-        "400":
-          $ref: "#/components/responses/InvalidRequest"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /readyz:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Saude]
       summary: Verifica se a API esta pronta para servir dados
       description: |
-        Executa um ping no PostgreSQL e verifica o contrato minimo da camada
-        Gold e das tabelas de publicacao de previsoes consumidas pela API. Nao
-        estar pronto resulta em `503`.
+        Executa um ping no PostgreSQL e verifica se as relacoes consumidas pela
+        API existem: `gold.load_batches`, `gold.dim_bairros`,
+        `gold.dim_categorias`, `gold.dim_indicadores`,
+        `gold.ocorrencias_mensais_ml_features`,
+        `gold.indicadores_socioeconomicos_anuais`,
+        `monthly_forecasts.forecast_runs` e
+        `monthly_forecasts.monthly_forecasts`. Verifica apenas a existencia das
+        relacoes, nao a presenca de batches correntes ou de previsoes. Nao
+        estar pronto resulta em `503`. A query string e ignorada.
       operationId: getReadiness
       responses:
         "200":
           description: PostgreSQL e contrato minimo de dados disponiveis.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -99,37 +141,43 @@ paths:
                 checks:
                   database: ok
                   data_contract: ok
-        "400":
-          $ref: "#/components/responses/InvalidRequest"
         "503":
           $ref: "#/components/responses/ReadinessUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/bairros:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Catalogos]
       summary: Lista os bairros
       description: |
         Retorna os 75 bairros publicados no catalogo territorial da Gold,
         ordenados por `nome` crescente e, como desempate, por `bairro_id`
-        crescente.
+        crescente. Nao aceita query parameters. Se o catalogo publicado nao
+        tiver exatamente 75 bairros, retorna `503 DATA_NOT_READY`.
       operationId: listBairros
       responses:
         "200":
           description: Catalogo territorial publicado.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BairrosResponse"
         "400":
-          $ref: "#/components/responses/InvalidRequest"
+          $ref: "#/components/responses/InvalidArgument"
         "503":
           $ref: "#/components/responses/DataUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/bairros/geojson:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Mapa]
       summary: Retorna as geometrias dos bairros
@@ -137,54 +185,73 @@ paths:
         Retorna as geometrias publicadas na Gold como uma `FeatureCollection`
         com exatamente 75 `Feature`s, ordenadas por nome do bairro e depois
         por `bairro_id`. O valor de `Feature.properties.bairro_id` e a chave
-        territorial usada por todos os demais endpoints.
+        territorial usada por todos os demais endpoints. A geometria e
+        devolvida exatamente como publicada na Gold (EPSG:4326). Nao aceita
+        query parameters. Se nao houver exatamente 75 geometrias publicadas,
+        retorna `503 DATA_NOT_READY`.
       operationId: getBairrosGeoJSON
       responses:
         "200":
           description: Geometrias territoriais publicadas.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/geo+json:
               schema:
                 $ref: "#/components/schemas/BairroFeatureCollection"
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BairroFeatureCollection"
         "400":
-          $ref: "#/components/responses/InvalidRequest"
+          $ref: "#/components/responses/InvalidArgument"
         "503":
           $ref: "#/components/responses/DataUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/categorias:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Catalogos]
       summary: Lista as categorias de ocorrencia
       description: |
         Retorna as seis categorias publicadas na Gold, ordenadas por nome de
-        exibicao crescente e depois por codigo crescente.
+        exibicao crescente e depois por codigo crescente. Nao aceita query
+        parameters. Se o catalogo nao tiver exatamente seis categorias,
+        retorna `503 DATA_NOT_READY`.
       operationId: listCategorias
       responses:
         "200":
           description: Catalogo das categorias publicadas.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CategoriasResponse"
         "400":
-          $ref: "#/components/responses/InvalidRequest"
+          $ref: "#/components/responses/InvalidArgument"
         "503":
           $ref: "#/components/responses/DataUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/ocorrencias:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Ocorrencias]
       summary: Consulta ocorrencias mensais observadas
       description: |
         Consulta exclusivamente as contagens observadas do batch Gold corrente
-        e retorna uma linha por bairro, categoria e competencia.
+        (`dataset = ml_features`) e retorna uma linha por bairro, categoria e
+        competencia. Sem `mes` e sem `de`/`ate`, retorna somente a ultima
+        competencia observada (`meta.data_through`).
+
+        Ordem das verificacoes: (1) validacao sintatica da query
+        (`400 INVALID_ARGUMENT`); (2) existencia do batch corrente
+        (`503 DATA_NOT_READY`); (3) existencia de `bairro_id` e `categoria`
+        (`400 INVALID_FILTER`).
 
         A ordenacao e por `mes` crescente, nome do bairro crescente,
         `bairro_id` crescente e `categoria` crescente.
@@ -198,6 +265,9 @@ paths:
       responses:
         "200":
           description: Ocorrencias observadas para os filtros aplicados.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -219,6 +289,8 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   /api/v1/previsoes:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Previsoes]
       summary: Consulta previsoes mensais publicadas
@@ -227,14 +299,28 @@ paths:
         ultima competencia observada (`X`) do batch Gold corrente. Uma linha e
         devolvida por bairro e categoria.
 
+        Uma publicacao e valida quando pertence ao batch Gold corrente, tem
+        `forecast_month` igual a `X + 1` e contem exatamente os mesmos pares
+        bairro/categoria observados em `X`, todos com bairro existente no
+        catalogo. Havendo mais de uma publicacao valida, vence a de
+        `generated_at` mais recente (desempate por `forecast_run_id`
+        decrescente).
+
         A completude da publicacao e validada antes da aplicacao dos filtros.
         A API nao consulta nem executa o modelo e nunca apresenta uma previsao
         de batch antigo como atual. Se a publicacao de `X + 1` estiver ausente,
         incompleta ou incompativel com a Gold corrente, retorna
         `503 FORECAST_NOT_READY`.
 
-        A ordenacao e por `mes` crescente, nome do bairro crescente,
-        `bairro_id` crescente e `categoria` crescente.
+        Aceita somente `bairro_id` e `categoria`; nao ha filtro de periodo.
+        Ordem das verificacoes: (1) validacao sintatica da query
+        (`400 INVALID_ARGUMENT`); (2) batch corrente (`503 DATA_NOT_READY`);
+        (3) publicacao valida (`503 FORECAST_NOT_READY`); (4) existencia de
+        `bairro_id` e `categoria` (`400 INVALID_FILTER`).
+
+        Todos os itens pertencem a `meta.forecast_month`. A ordenacao e por
+        nome do bairro crescente, `bairro_id` crescente e `categoria`
+        crescente.
       operationId: listPrevisoes
       parameters:
         - $ref: "#/components/parameters/BairrosFiltro"
@@ -242,6 +328,9 @@ paths:
       responses:
         "200":
           description: Previsao publicada e valida para os filtros aplicados.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -270,36 +359,52 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   /api/v1/indicadores/catalogo:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Indicadores]
       summary: Lista o catalogo de indicadores socioeconomicos
       description: |
         Retorna os seis indicadores que compoem o IQV, ordenados pela ordem de
-        exibicao publicada e, como desempate, pelo codigo.
+        exibicao publicada e, como desempate, pelo codigo. Nao aceita query
+        parameters. Se o catalogo nao tiver exatamente seis indicadores,
+        retorna `503 DATA_NOT_READY`.
       operationId: listIndicadoresCatalogo
       responses:
         "200":
           description: Catalogo dos indicadores publicados.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/IndicadoresCatalogoResponse"
         "400":
-          $ref: "#/components/responses/InvalidRequest"
+          $ref: "#/components/responses/InvalidArgument"
         "503":
           $ref: "#/components/responses/DataUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
 
   /api/v1/indicadores:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [Indicadores]
       summary: Consulta indicadores socioeconomicos anuais
       description: |
         Consulta os valores publicados no batch `socioeconomic_features`
-        corrente. Sem periodo, usa o maior ano realmente publicado nesse
-        batch. A ordenacao e por ano, ordem de exibicao e codigo do indicador,
-        nome do bairro e `bairro_id`, todos crescentes.
+        corrente. Retorna uma linha por bairro, indicador e ano. Sem `ano` e
+        sem `de`/`ate`, usa o maior ano realmente publicado nesse batch.
+
+        Ordem das verificacoes: (1) validacao sintatica da query
+        (`400 INVALID_ARGUMENT`); (2) existencia do batch socioeconomico
+        corrente (`503 DATA_NOT_READY`); (3) existencia de `bairro_id` e
+        `indicador` (`400 INVALID_FILTER`).
+
+        A ordenacao e por ano, ordem de exibicao e codigo do indicador, nome
+        do bairro e `bairro_id`, todos crescentes.
       operationId: listIndicadores
       parameters:
         - $ref: "#/components/parameters/BairrosFiltro"
@@ -310,6 +415,9 @@ paths:
       responses:
         "200":
           description: Valores dos indicadores para os filtros aplicados.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -331,12 +439,21 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   /api/v1/iqv:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
     get:
       tags: [IQV]
       summary: Consulta o Indice de Qualidade de Vida
       description: |
-        Consulta exclusivamente o IQV anual publicado no batch Gold corrente e
-        retorna uma linha por bairro e ano.
+        Consulta exclusivamente o IQV anual publicado no batch
+        `socioeconomic_features` corrente e retorna uma linha por bairro e
+        ano. Sem `ano` e sem `de`/`ate`, usa o maior ano publicado nesse
+        batch.
+
+        Ordem das verificacoes: (1) validacao sintatica da query
+        (`400 INVALID_ARGUMENT`); (2) existencia do batch socioeconomico
+        corrente (`503 DATA_NOT_READY`); (3) existencia de `bairro_id`
+        (`400 INVALID_FILTER`).
 
         Com mais de um ano, agrupa o resultado por `ano` crescente. Dentro de
         cada ano, ordena por `iqv` na direcao indicada por `ordem` (padrao
@@ -352,6 +469,9 @@ paths:
       responses:
         "200":
           description: IQV para os filtros e a ordenacao aplicados.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -373,6 +493,22 @@ paths:
 
 components:
   parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: |
+        Identificador de correlacao opcional enviado pelo cliente. E reutilizado
+        somente se houver exatamente um header com 1 a 128 caracteres em
+        `[A-Za-z0-9._-]`; caso contrario, o servidor gera um novo. O valor
+        efetivo e devolvido no header `X-Request-ID` e em `error.request_id`.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._-]+$"
+      example: "dashboard-7a4626f4"
+
     BairrosFiltro:
       name: bairro_id
       in: query
@@ -381,9 +517,11 @@ components:
         Um ou mais IDs territoriais exatos retornados por
         `GET /api/v1/bairros`. Repita o parametro para selecionar varios
         bairros: `?bairro_id=centro&bairro_id=batel`. Quando omitido, inclui os
-        75 bairros. Lista vazia ou valor duplicado retorna
-        `400 INVALID_ARGUMENT`; qualquer codigo inexistente retorna
-        `400 INVALID_FILTER`.
+        75 bairros. Valor vazio, valor duplicado, mais de 75 valores ou valor
+        com mais de 100 caracteres retorna `400 INVALID_ARGUMENT`. Qualquer
+        valor com ate 100 caracteres que nao exista no catalogo, inclusive
+        fora do padrao de `BairroId`, retorna `400 INVALID_FILTER` com a
+        mensagem `unknown bairro_id`.
       schema:
         type: array
         minItems: 1
@@ -405,9 +543,10 @@ components:
         Uma ou mais categorias exatas retornadas por
         `GET /api/v1/categorias`. Repita o parametro para selecionar varias
         categorias: `?categoria=CRIME_PATRIMONIAL&categoria=CRIME_VIOLENTO`.
-        Quando omitido, inclui as seis categorias. Lista vazia ou valor
-        duplicado retorna `400 INVALID_ARGUMENT`; qualquer codigo inexistente
-        retorna `400 INVALID_FILTER`.
+        Quando omitido, inclui as seis categorias. Valor vazio, valor
+        duplicado ou mais de seis valores retorna `400 INVALID_ARGUMENT`;
+        qualquer codigo inexistente retorna `400 INVALID_FILTER` com a
+        mensagem `unknown categoria`.
       schema:
         type: array
         minItems: 1
@@ -428,9 +567,10 @@ components:
       description: |
         Um ou mais codigos exatos retornados por
         `GET /api/v1/indicadores/catalogo`. Repita o parametro para selecionar
-        varios indicadores. Quando omitido, inclui os seis indicadores. Lista
-        vazia ou valor duplicado retorna `400 INVALID_ARGUMENT`; codigo
-        inexistente retorna `400 INVALID_FILTER`.
+        varios indicadores. Quando omitido, inclui os seis indicadores. Valor
+        vazio, valor duplicado ou mais de seis valores retorna
+        `400 INVALID_ARGUMENT`; codigo inexistente retorna
+        `400 INVALID_FILTER` com a mensagem `unknown indicador`.
       schema:
         type: array
         minItems: 1
@@ -449,8 +589,11 @@ components:
         Repita o parametro para selecionar competencias nao contiguas:
         `?mes=2026-05&mes=2026-07`. E incompativel com `de` e `ate`. Quando
         nenhum filtro de periodo e informado, usa a ultima competencia
-        observada do batch Gold corrente. Lista vazia, competencia duplicada ou
-        formato invalido retorna `400 INVALID_ARGUMENT`.
+        observada do batch Gold corrente. O formato e estrito: exatamente sete
+        caracteres, com mes entre `01` e `12` (`2026-7` e `2026-13` sao
+        invalidos). Valor vazio, competencia duplicada, mais de 240 valores ou
+        formato invalido retorna `400 INVALID_ARGUMENT`. Competencias validas
+        sem dados no batch nao geram erro; apenas nao retornam linhas.
       schema:
         type: array
         minItems: 1
@@ -468,8 +611,9 @@ components:
       name: de
       in: query
       description: |
-        Primeira competencia do intervalo inclusivo. Deve ser enviada com
-        `ate` e sem nenhuma ocorrencia de `mes`.
+        Primeira competencia do intervalo inclusivo, no formato estrito
+        `YYYY-MM`. Deve aparecer uma unica vez, ser enviada com `ate` e sem
+        nenhuma ocorrencia de `mes`.
       schema:
         $ref: "#/components/schemas/CompetenciaMensal"
       example: "2025-01"
@@ -478,9 +622,11 @@ components:
       name: ate
       in: query
       description: |
-        Ultima competencia do intervalo inclusivo. Deve ser enviada com `de`,
-        sem nenhuma ocorrencia de `mes`; `de` deve ser menor ou igual a `ate`
-        e o intervalo total nao pode exceder 240 meses.
+        Ultima competencia do intervalo inclusivo, no formato estrito
+        `YYYY-MM`. Deve aparecer uma unica vez, ser enviada com `de` e sem
+        nenhuma ocorrencia de `mes`; `de` deve ser menor ou igual a `ate` e o
+        intervalo total, contando os dois extremos, nao pode exceder 240
+        meses.
       schema:
         $ref: "#/components/schemas/CompetenciaMensal"
       example: "2026-07"
@@ -493,12 +639,15 @@ components:
         Um ou mais anos especificos. Repita o parametro para selecionar anos
         nao contiguos: `?ano=2020&ano=2022`. E incompativel com `de` e `ate`.
         Quando nenhum filtro anual e informado, usa o ano mais recente
-        publicado no batch Gold corrente. Lista vazia, ano duplicado ou valor
-        fora do dominio publicado retorna `400 INVALID_ARGUMENT`.
+        publicado no batch socioeconomico corrente. Valor vazio, ano
+        duplicado, valor nao inteiro ou fora do intervalo 2009-2050 retorna
+        `400 INVALID_ARGUMENT`. O limite de 42 valores corresponde a todos os
+        anos do intervalo. Anos validos sem dados publicados nao geram erro;
+        apenas nao retornam linhas.
       schema:
         type: array
         minItems: 1
-        maxItems: 20
+        maxItems: 42
         uniqueItems: true
         items:
           $ref: "#/components/schemas/Ano"
@@ -512,8 +661,9 @@ components:
       name: de
       in: query
       description: |
-        Primeiro ano do intervalo inclusivo. Deve ser enviado com `ate` e sem
-        nenhuma ocorrencia de `ano`.
+        Primeiro ano do intervalo inclusivo, entre 2009 e 2050. Deve aparecer
+        uma unica vez, ser enviado com `ate` e sem nenhuma ocorrencia de
+        `ano`.
       schema:
         $ref: "#/components/schemas/Ano"
       example: 2019
@@ -522,8 +672,9 @@ components:
       name: ate
       in: query
       description: |
-        Ultimo ano do intervalo inclusivo. Deve ser enviado com `de` e sem
-        nenhuma ocorrencia de `ano`; `de` deve ser menor ou igual a `ate`.
+        Ultimo ano do intervalo inclusivo, entre 2009 e 2050. Deve aparecer
+        uma unica vez, ser enviado com `de` e sem nenhuma ocorrencia de `ano`;
+        `de` deve ser menor ou igual a `ate`.
       schema:
         $ref: "#/components/schemas/Ano"
       example: 2022
@@ -532,8 +683,9 @@ components:
       name: ordem
       in: query
       description: |
-        Direcao da ordenacao por IQV dentro de cada ano. Valor diferente de
-        `asc` ou `desc` retorna `400 INVALID_ARGUMENT`.
+        Direcao da ordenacao por IQV dentro de cada ano. Deve aparecer no
+        maximo uma vez. Valor diferente de `asc` ou `desc` (sensivel a
+        maiusculas) retorna `400 INVALID_ARGUMENT`.
       schema:
         type: string
         enum: [asc, desc]
@@ -560,13 +712,44 @@ components:
                   code: INVALID_ARGUMENT
                   message: invalid query parameter
                   request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
-            invalidFilter:
-              summary: Codigo de filtro inexistente
+            invalidBairroFilter:
+              summary: Bairro inexistente
               value:
                 error:
                   code: INVALID_FILTER
                   message: unknown bairro_id
                   request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            invalidCategoriaFilter:
+              summary: Categoria inexistente
+              value:
+                error:
+                  code: INVALID_FILTER
+                  message: unknown categoria
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            invalidIndicadorFilter:
+              summary: Indicador inexistente
+              value:
+                error:
+                  code: INVALID_FILTER
+                  message: unknown indicador
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+
+    InvalidArgument:
+      description: |
+        Algum query parameter foi enviado para um endpoint que nao aceita
+        query parameters.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: INVALID_ARGUMENT
+              message: invalid query parameter
+              request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
 
     ReadinessUnavailable:
       description: |
@@ -579,11 +762,29 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            databaseUnavailable:
+              value:
+                error:
+                  code: DATABASE_UNAVAILABLE
+                  message: database unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            dataContractNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: data contract unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
 
     DataUnavailable:
       description: |
-        PostgreSQL indisponivel (`DATABASE_UNAVAILABLE`) ou batch Gold corrente
-        ausente (`DATA_NOT_READY`).
+        PostgreSQL indisponivel ou consulta acima do tempo limite
+        (`DATABASE_UNAVAILABLE`), ou dados publicados indisponiveis
+        (`DATA_NOT_READY`). Nos catalogos e no mapa, `DATA_NOT_READY` indica
+        que a contagem publicada difere da esperada (75 bairros, 6 categorias
+        ou 6 indicadores). Em ocorrencias, indica ausencia do batch
+        `ml_features` corrente; em indicadores e IQV, ausencia do batch
+        `socioeconomic_features` corrente ou de anos publicados nele.
       headers:
         X-Request-ID:
           $ref: "#/components/headers/RequestId"
@@ -591,6 +792,49 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            databaseUnavailable:
+              value:
+                error:
+                  code: DATABASE_UNAVAILABLE
+                  message: database unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            bairroCatalogNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: bairro catalog unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            bairroGeometryCatalogNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: bairro geometry catalog unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            categoriaCatalogNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: categoria catalog unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            indicadorCatalogNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: indicador catalog unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            currentGoldBatchNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: current Gold batch unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
+            currentSocioeconomicBatchNotReady:
+              value:
+                error:
+                  code: DATA_NOT_READY
+                  message: current socioeconomic Gold batch unavailable
+                  request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
 
     ForecastUnavailable:
       description: |
@@ -633,10 +877,18 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: internal server error
+              request_id: 7a4626f4-4ade-419f-9d60-bd476929733d
 
   headers:
     RequestId:
-      description: Identificador da requisicao usado para correlacao.
+      description: |
+        Identificador da requisicao usado para correlacao. Presente em todas as
+        respostas; repete o `X-Request-ID` recebido quando valido ou contem um
+        valor gerado pelo servidor.
       schema:
         type: string
       example: "7a4626f4-4ade-419f-9d60-bd476929733d"
@@ -724,8 +976,9 @@ components:
     TipoEstimativa:
       type: string
       description: |
-        Origem temporal do IQV anual, preservada exatamente como publicada na
-        Gold.
+        Origem temporal do valor anual (IQV ou indicador socioeconomico),
+        preservada exatamente como publicada na Gold: `observado` para anos de
+        censo, `interpolado` entre censos e `extrapolado` fora deles.
       enum: [observado, interpolado, extrapolado]
       example: observado
 
@@ -961,7 +1214,9 @@ components:
         generated_at:
           type: string
           format: date-time
-          description: Data e hora de geracao da publicacao em RFC 3339.
+          description: |
+            Data e hora de geracao da publicacao em RFC 3339, sempre em UTC e
+            sem fracao de segundos (`YYYY-MM-DDTHH:MM:SSZ`).
           example: "2026-08-01T12:30:00Z"
         forecast_month:
           allOf:
