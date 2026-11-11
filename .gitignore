@@ -24,6 +24,8 @@ TASKS.md
 *.parquet
 *.drawio
 
+poetry.lock
+
 TASKS_FASTAPI.md
 api/docs/ROTAS.md
 
