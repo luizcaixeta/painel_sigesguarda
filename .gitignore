@@ -22,6 +22,10 @@ TASKS.md
 *.jpg
 *.json
 *.parquet
+*.drawio
+
+TASKS_FASTAPI.md
+api/docs/ROTAS.md
 
 .vscode
 
