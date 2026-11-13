@@ -23,6 +23,7 @@ TASKS.md
 *.json
 *.parquet
 *.drawio
+*.coverage
 
 poetry.lock
 
