@@ -6,7 +6,7 @@ authors = [
     {name = "luizcaixeta",email = "luizfernandosusu@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<4.0"
 dependencies = [
     "fastapi[standard] (>=0.162.4,<0.163.0)"
 ]
@@ -20,7 +20,8 @@ build-backend = "poetry.core.masonry.api"
 dev = [
     "ruff (>=0.17.5,<0.18.0)",
     "pytest (>=9.2.0,<10.0.0)",
-    "pytest-cov (>=7.1.0,<8.0.0)"
+    "pytest-cov (>=7.1.0,<8.0.0)",
+    "taskipy (>=1.14.1,<2.0.0)"
 ]
 
 [tool.ruff]
@@ -38,3 +39,9 @@ quote-style = 'single'
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = '-p no:warnings'
+
+[tool.taskipy.tasks]
+lint = 'ruff check'
+format = 'ruff format'
+run = 'fastapi dev api_fastapi/app.py'
+test = 'pytest -s -x --cov=api_fastapi -vv'
